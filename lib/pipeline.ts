@@ -1,0 +1,2 @@
+export type PipelineStep={id:string;name:string;status:"pending"|"ready"|"running"|"complete"|"failed"};
+export const createPipeline=():PipelineStep[]=>["Research","Hook","Script","Voice","Visuals","Edit","Thumbnail","SEO","Publish"].map((name,i)=>({id:String(i+1),name,status:i===0?"ready":"pending"}));
