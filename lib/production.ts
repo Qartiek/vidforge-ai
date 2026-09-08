@@ -1,0 +1,2 @@
+export type ProductionPlan={voice:{provider:"tts";style:string};visuals:{format:"16:9";sources:string[]};thumbnail:{format:"1280x720";variants:number};seo:{titleVariants:number;description:true;tags:true};};
+export function buildProductionPlan(tone="clear and engaging"):ProductionPlan{return {voice:{provider:"tts",style:tone},visuals:{format:"16:9",sources:["licensed stock","user assets","generated visuals"]},thumbnail:{format:"1280x720",variants:3},seo:{titleVariants:5,description:true,tags:true}};}
