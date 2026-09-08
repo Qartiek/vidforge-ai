@@ -1,0 +1,3 @@
+import {NextResponse} from "next/server";
+import {buildResearchPlan} from "../../../lib/research";
+export async function POST(request:Request){const body=await request.json().catch(()=>null);if(typeof body?.company!=="string"||!body.company.trim())return NextResponse.json({error:"company is required"},{status:400});const company=body.company.trim().slice(0,120);const angle=typeof body.angle==="string"?body.angle.trim().slice(0,300):"Business model and financial analysis";return NextResponse.json({jobId:crypto.randomUUID(),status:"research_plan_ready",company,angle,plan:buildResearchPlan(company,angle),note:"Source retrieval must run server-side and every material financial claim must be evidence-checked before publication."},{status:202});}
