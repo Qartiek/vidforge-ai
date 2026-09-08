@@ -18,51 +18,111 @@ const schema = z.object({
 export async function POST(request: Request) {
   const user = await requireAuth();
   const limited = await rateLimit(`youtube-publish:${user.id}`, 10, 60);
-  if (!limited) return NextResponse.json({ error: "Too many publish requests" }, { status: 429 });
+  if (!limited.allowed) {
+    return NextResponse.json(
+      { error: "Too many publish requests", retryAt: limited.resetAt.toISOString() },
+      { status: 429 },
+    );
+  }
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid publish request" }, { status: 400 });
   const input = parsed.data;
 
-  const connection = await db.youTubeConnection.findUnique({ where: { userId: user.id }, select: { id: true } });
+  const connection = await db.youTubeConnection.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
   if (!connection) return NextResponse.json({ error: "Connect YouTube before publishing" }, { status: 409 });
 
   if (input.projectId) {
-    const project = await db.project.findFirst({ where: { id: input.projectId, userId: user.id }, select: { id: true } });
+    const project = await db.project.findFirst({
+      where: { id: input.projectId, userId: user.id },
+      select: { id: true },
+    });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  try {
-    const publish = await db.youTubePublish.create({
-      data: {
+  const existing = await db.youTubePublish.findUnique({
+    where: {
+      userId_idempotencyKey: {
         userId: user.id,
-        projectId: input.projectId,
         idempotencyKey: input.idempotencyKey,
-        title: input.title,
-        description: input.description,
-        tagsJson: input.tags ? JSON.stringify(input.tags) : null,
-        privacyStatus: input.privacyStatus,
-        assetRef: input.assetRef,
       },
+    },
+    select: { id: true, status: true },
+  });
+  if (existing) {
+    return NextResponse.json(
+      { publishId: existing.id, status: existing.status, duplicate: true },
+      { status: 200 },
+    );
+  }
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      const publish = await tx.youTubePublish.create({
+        data: {
+          userId: user.id,
+          projectId: input.projectId,
+          idempotencyKey: input.idempotencyKey,
+          title: input.title,
+          description: input.description,
+          tagsJson: input.tags ? JSON.stringify(input.tags) : null,
+          privacyStatus: input.privacyStatus,
+          assetRef: input.assetRef,
+        },
+      });
+
+      const job = await tx.job.create({
+        data: {
+          userId: user.id,
+          projectId: input.projectId,
+          type: "YOUTUBE_PUBLISH",
+          payload: JSON.stringify({ publishId: publish.id }),
+        },
+      });
+
+      return { publish, job };
     });
 
-    const job = await db.job.create({
-      data: {
-        userId: user.id,
-        projectId: input.projectId,
-        type: "YOUTUBE_PUBLISH",
-        payload: JSON.stringify({ publishId: publish.id }),
-      },
+    await audit({
+      userId: user.id,
+      action: "YOUTUBE_PUBLISH_REQUESTED",
+      resource: "YOUTUBE_PUBLISH",
+      resourceId: result.publish.id,
+      metadata: JSON.stringify({ jobId: result.job.id, privacyStatus: input.privacyStatus }),
     });
 
-    await audit({ userId: user.id, action: "YOUTUBE_PUBLISH_REQUESTED", resource: "YOUTUBE_PUBLISH", resourceId: publish.id, metadata: JSON.stringify({ jobId: job.id, privacyStatus: input.privacyStatus }) });
-    return NextResponse.json({ publishId: publish.id, jobId: job.id, status: publish.status }, { status: 202 });
+    return NextResponse.json(
+      { publishId: result.publish.id, jobId: result.job.id, status: result.publish.status },
+      { status: 202 },
+    );
   } catch (error) {
     if (error instanceof Error && error.message.includes("Unique constraint")) {
-      const existing = await db.youTubePublish.findUnique({ where: { userId_idempotencyKey: { userId: user.id, idempotencyKey: input.idempotencyKey } }, select: { id: true, status: true } });
-      if (existing) return NextResponse.json({ publishId: existing.id, status: existing.status, duplicate: true }, { status: 200 });
+      const raced = await db.youTubePublish.findUnique({
+        where: {
+          userId_idempotencyKey: {
+            userId: user.id,
+            idempotencyKey: input.idempotencyKey,
+          },
+        },
+        select: { id: true, status: true },
+      });
+      if (raced) {
+        return NextResponse.json(
+          { publishId: raced.id, status: raced.status, duplicate: true },
+          { status: 200 },
+        );
+      }
     }
-    await audit({ userId: user.id, action: "YOUTUBE_PUBLISH_REQUESTED", resource: "YOUTUBE_PUBLISH", success: false });
+
+    await audit({
+      userId: user.id,
+      action: "YOUTUBE_PUBLISH_REQUESTED",
+      resource: "YOUTUBE_PUBLISH",
+      success: false,
+    });
     return NextResponse.json({ error: "Unable to queue publish" }, { status: 500 });
   }
 }
