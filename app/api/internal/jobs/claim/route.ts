@@ -1,17 +1,46 @@
 import { NextResponse } from "next/server";
 import { db } from "../../../../../lib/db";
 
-function authorized(request: Request) { const expected = process.env.JOB_WORKER_SECRET; return !!expected && request.headers.get("x-job-worker-secret") === expected; }
+function authorized(request: Request) {
+  const expected = process.env.JOB_WORKER_SECRET;
+  return !!expected && request.headers.get("x-job-worker-secret") === expected;
+}
+
 export async function POST(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  for (let i = 0; i < 3; i++) {
-    const candidate = await db.job.findFirst({ where: { status: "QUEUED" }, orderBy: { createdAt: "asc" }, select: { id: true } });
-    if (!candidate) return NextResponse.json({ job: null });
-    const claimed = await db.job.updateMany({ where: { id: candidate.id, status: "QUEUED" }, data: { status: "RUNNING", startedAt: new Date(), attempts: { increment: 1 } } });
-    if (claimed.count === 1) {
-      const job = await db.job.findUnique({ where: { id: candidate.id }, select: { id: true, type: true, payload: true, projectId: true, attempts: true } });
-      return NextResponse.json({ job });
-    }
+  if (!authorized(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  return NextResponse.json({ job: null });
+
+  const claimed = await db.$queryRaw<
+    Array<{
+      id: string;
+      type: string;
+      payload: unknown;
+      projectId: string | null;
+      attempts: number;
+    }>
+  >`
+    WITH candidate AS (
+      SELECT "id"
+      FROM "Job"
+      WHERE "status" = 'QUEUED'
+      ORDER BY "createdAt" ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    )
+    UPDATE "Job" AS j
+    SET
+      "status" = 'RUNNING',
+      "startedAt" = NOW(),
+      "attempts" = j."attempts" + 1
+    FROM candidate
+    WHERE j."id" = candidate."id"
+    RETURNING j."id", j."type", j."payload", j."projectId", j."attempts";
+  `;
+
+  if (claimed.length === 0) {
+    return NextResponse.json({ job: null });
+  }
+
+  return NextResponse.json({ job: claimed[0] });
 }
