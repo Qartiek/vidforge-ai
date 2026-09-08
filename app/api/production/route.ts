@@ -1,0 +1,3 @@
+import {NextResponse} from "next/server";
+import {buildProductionPlan} from "../../../lib/production";
+export async function POST(request:Request){const body=await request.json().catch(()=>null);if(typeof body?.company!=="string"||!body.company.trim())return NextResponse.json({error:"company is required"},{status:400});return NextResponse.json({jobId:crypto.randomUUID(),status:"production_plan_ready",company:body.company.trim().slice(0,120),plan:buildProductionPlan(typeof body.tone==="string"?body.tone:"clear and engaging"),stages:["voice","visuals","edit","thumbnail","seo","export"]},{status:202});}
