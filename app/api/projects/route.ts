@@ -1,0 +1,3 @@
+import {NextResponse} from "next/server";
+export async function GET(){return NextResponse.json({projects:[],message:"Project storage will be connected to the database layer next."});}
+export async function POST(request:Request){const body=await request.json();if(!body?.topic)return NextResponse.json({error:"topic is required"},{status:400});return NextResponse.json({id:crypto.randomUUID(),topic:body.topic,status:"queued",pipeline:["research","hook","script","voice","visuals","edit","thumbnail","seo","publish"]},{status:201});}
