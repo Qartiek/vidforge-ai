@@ -1,0 +1,27 @@
+generator client { provider = "prisma-client-js" }
+
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  plan      Plan      @default(FREE)
+  credits   Int       @default(0)
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+model Project {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  topic     String
+  status    ProjectStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+enum Plan { FREE STARTER PRO BUSINESS }
+enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
