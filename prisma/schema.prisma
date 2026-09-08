@@ -3,17 +3,18 @@ generator client { provider = "prisma-client-js" }
 datasource db { provider = "postgresql" url = env("DATABASE_URL") }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String             @id @default(cuid())
+  email        String             @unique
   name         String?
   passwordHash String
-  role         Role       @default(USER)
-  plan         Plan       @default(FREE)
-  credits      Int        @default(0)
-  createdAt    DateTime   @default(now())
+  role         Role               @default(USER)
+  plan         Plan               @default(FREE)
+  credits      Int                @default(0)
+  createdAt    DateTime           @default(now())
   projects     Project[]
   jobs         Job[]
   auditLogs    AuditLog[]
+  youtube      YouTubeConnection?
 }
 
 model Project {
@@ -67,6 +68,20 @@ model RateLimit {
   bucket    DateTime
   count     Int      @default(0)
   @@index([key, bucket])
+}
+
+model YouTubeConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId    String?
+  channelTitle String?
+  accessToken  String?
+  refreshToken String
+  expiresAt    DateTime?
+  scope        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 enum Role { USER ADMIN }
