@@ -2,6 +2,45 @@ import { db } from "./db";
 import { decryptSecret, encryptSecret } from "./crypto";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const YOUTUBE_MAX_TITLE = 100;
+const YOUTUBE_MAX_DESCRIPTION_BYTES = 5000;
+const YOUTUBE_MAX_TAGS = 500;
+const ALLOWED_PRIVACY = new Set(["private", "public", "unlisted"]);
+
+function utf8Bytes(value: string) {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function validateYouTubeMetadata(input: {
+  title: string;
+  description?: string | null;
+  tags?: string[];
+  privacyStatus: string;
+}) {
+  const title = input.title.trim();
+  const description = input.description?.trim() ?? "";
+  const tags = input.tags ?? [];
+
+  if (!title || title.length > YOUTUBE_MAX_TITLE) {
+    throw new Error("YouTube title must be between 1 and 100 characters");
+  }
+  if (utf8Bytes(description) > YOUTUBE_MAX_DESCRIPTION_BYTES) {
+    throw new Error("YouTube description exceeds the 5000-byte limit");
+  }
+  if (!Array.isArray(tags) || tags.length > 500) {
+    throw new Error("YouTube tags list is invalid or too large");
+  }
+  const normalizedTags = tags.map((tag) => String(tag).trim()).filter(Boolean);
+  const totalTagBytes = normalizedTags.reduce((total, tag) => total + utf8Bytes(tag), 0);
+  if (totalTagBytes > YOUTUBE_MAX_TAGS) {
+    throw new Error("YouTube tags exceed the 500-byte limit");
+  }
+  if (!ALLOWED_PRIVACY.has(input.privacyStatus)) {
+    throw new Error("Invalid YouTube privacy status");
+  }
+
+  return { title, description, tags: normalizedTags };
+}
 
 export async function getValidYouTubeAccessToken(userId: string) {
   const connection = await db.youTubeConnection.findUnique({ where: { userId } });
@@ -23,10 +62,11 @@ export async function getValidYouTubeAccessToken(userId: string) {
 }
 
 export async function uploadYouTubeVideo(accessToken: string, input: { file: string; title: string; description?: string | null; tags?: string[]; privacyStatus: string }) {
+  const metadata = validateYouTubeMetadata(input);
   const fs = await import("node:fs/promises");
   const stat = await fs.stat(input.file);
   if (stat.size <= 0) throw new Error("Video asset is empty");
-  const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", { method: "POST", headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json; charset=UTF-8", "x-upload-content-type": "video/mp4", "x-upload-content-length": String(stat.size) }, body: JSON.stringify({ snippet: { title: input.title, description: input.description ?? "", tags: input.tags?.slice(0, 500) ?? [] }, status: { privacyStatus: input.privacyStatus } }), signal: AbortSignal.timeout(15000) });
+  const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", { method: "POST", headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json; charset=UTF-8", "x-upload-content-type": "video/mp4", "x-upload-content-length": String(stat.size) }, body: JSON.stringify({ snippet: { title: metadata.title, description: metadata.description, tags: metadata.tags }, status: { privacyStatus: input.privacyStatus } }), signal: AbortSignal.timeout(15000) });
   if (!init.ok) throw new Error(`YouTube upload initialization failed (${init.status})`);
   const location = init.headers.get("location");
   if (!location) throw new Error("YouTube did not return an upload URL");
