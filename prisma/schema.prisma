@@ -40,7 +40,35 @@ model Project {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   jobs      Job[]
+  sources   ResearchSource[]
+  findings  ResearchFinding[]
   publishes YouTubePublish[]
+}
+
+model ResearchSource {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url        String
+  title      String?
+  publisher  String?
+  fetchedAt  DateTime @default(now())
+  contentHash String?
+  @@unique([projectId, url])
+  @@index([projectId, fetchedAt])
+}
+
+model ResearchFinding {
+  id          String   @id @default(cuid())
+  projectId   String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceId    String?
+  claim       String
+  evidence    String
+  confidence  Float    @default(0)
+  createdAt   DateTime @default(now())
+  @@index([projectId, createdAt])
+  @@index([sourceId])
 }
 
 model Job {
