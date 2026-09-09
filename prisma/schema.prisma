@@ -42,6 +42,7 @@ model Project {
   jobs      Job[]
   sources   ResearchSource[]
   findings  ResearchFinding[]
+  scripts   ContentScript[]
   publishes YouTubePublish[]
 }
 
@@ -70,6 +71,20 @@ model ResearchFinding {
   createdAt   DateTime @default(now())
   @@index([projectId, createdAt])
   @@index([sourceId])
+}
+
+model ContentScript {
+  id         String   @id @default(cuid())
+  projectId  String   @unique
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hook       String
+  title      String
+  script     String   @db.Text
+  seoTitle   String
+  description String   @db.Text
+  tagsJson   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Job {
