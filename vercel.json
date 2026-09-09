@@ -3,6 +3,10 @@
     {
       "path": "/api/worker/youtube/run",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/worker/pipeline/run",
+      "schedule": "* * * * *"
     }
   ]
 }
