@@ -54,6 +54,7 @@ model ResearchSource {
   publisher  String?
   fetchedAt  DateTime @default(now())
   contentHash String?
+  content     String   @db.Text
   @@unique([projectId, url])
   @@index([projectId, fetchedAt])
 }
