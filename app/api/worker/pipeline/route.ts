@@ -50,7 +50,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, stage, nextJobId, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pipeline stage failed";
-    await db.job.update({ where: { id: job.id }, data: { status: "FAILED", finishedAt: new Date(), error: message.slice(0, 1000) } });
-    return NextResponse.json({ error: "Pipeline stage failed", jobId: job.id }, { status: 500 });
+    const retryable = job.attempts < MAX_ATTEMPTS;
+    await db.job.update({ where: { id: job.id }, data: { status: retryable ? "QUEUED" : "FAILED", finishedAt: retryable ? null : new Date(), error: message.slice(0, 1000) } });
+    return NextResponse.json({ error: "Pipeline stage failed", jobId: job.id, retryable }, { status: retryable ? 503 : 500 });
   }
 }
