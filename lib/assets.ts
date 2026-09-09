@@ -1,0 +1,5 @@
+import {createHash} from "crypto";
+const allowed=new Set(["image/jpeg","image/png","image/webp","video/mp4"]);
+export function validateAssetUrl(value:string){const u=new URL(value);if(!["http:","https:"].includes(u.protocol))throw new Error("Only HTTP(S) asset URLs are allowed");return u.toString();}
+export async function acquireAsset(url:string){const safe=validateAssetUrl(url);const r=await fetch(safe,{redirect:"follow",signal:AbortSignal.timeout(15000),headers:{"user-agent":"VidForgeAI-Asset/1.0"}});if(!r.ok)throw new Error("Asset download failed");const type=(r.headers.get("content-type")||"").split(";")[0];if(!allowed.has(type))throw new Error("Unsupported asset MIME type");const bytes=Buffer.from(await r.arrayBuffer());if(bytes.length>25*1024*1024)throw new Error("Asset exceeds 25MB limit");return {url:safe,mimeType:type,sha256:createHash("sha256").update(bytes).digest("hex")};}
+export function buildAssetQuery(prompt:string){return prompt.replace(/https?:\/\/\S+/g,"").slice(0,300);}
