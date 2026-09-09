@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "../../../../../lib/db";
+import { z } from "zod";
 
 const schema = z.object({
   jobId: z.string().min(1).max(100),
   status: z.enum(["SUCCEEDED", "FAILED"]),
   error: z.string().max(2000).optional(),
   youtubeVideoId: z.string().min(1).max(100).optional(),
+}).superRefine((value, ctx) => {
+  if (value.status === "SUCCEEDED" && !value.youtubeVideoId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["youtubeVideoId"], message: "Required when a job succeeds" });
+  }
+  if (value.status === "FAILED" && value.youtubeVideoId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["youtubeVideoId"], message: "Not allowed when a job fails" });
+  }
 });
 
 const publishPayloadSchema = z.object({
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
           throw new Error("Invalid publish job payload");
         }
 
-        await tx.youTubePublish.updateMany({
+        const updated = await tx.youTubePublish.updateMany({
           where: {
             id: publishPayload.data.publishId,
             userId: job.userId,
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
             status === "SUCCEEDED"
               ? {
                   status: "PUBLISHED",
-                  youtubeVideoId: youtubeVideoId ?? null,
+                  youtubeVideoId: youtubeVideoId!,
                   error: null,
                   publishedAt: new Date(),
                 }
@@ -69,6 +76,10 @@ export async function POST(request: Request) {
                   error: error ?? "YouTube publish job failed",
                 },
         });
+
+        if (updated.count !== 1) {
+          throw new Error("Publish record is no longer in a completable state");
+        }
       }
 
       await tx.job.update({
