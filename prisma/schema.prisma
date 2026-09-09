@@ -145,6 +145,7 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
+  @@unique([action, resourceId])
 }
 
 model RateLimit {
