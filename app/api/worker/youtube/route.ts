@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     if (recovered.count !== 1) return NextResponse.json({ status: "RUNNING" }, { status: 409 });
     const refreshed = await db.job.findUnique({ where: { id: job.id } });
     if (!refreshed) return NextResponse.json({ error: "YouTube publish job not found" }, { status: 404 });
+    Object.assign(job, refreshed);
   }
   if (job.status === "SUCCEEDED") return NextResponse.json({ status: job.status }); if (job.attempts >= MAX_ATTEMPTS) return NextResponse.json({ error: "Retry limit reached", status: job.status }, { status: 409 });
   const claimed = await db.job.updateMany({ where: { id: job.id, status: "QUEUED", attempts: job.attempts }, data: { status: "RUNNING", attempts: { increment: 1 }, startedAt: new Date(), error: null } }); if (claimed.count !== 1) return NextResponse.json({ status: "RUNNING" }, { status: 409 });
@@ -25,9 +26,9 @@ export async function POST(request: Request) {
     const payload = JSON.parse(job.payload) as { publishId?: string }; publishId = payload.publishId; if (!publishId) throw new Error("Invalid YouTube publish job payload");
     const publish = await db.youTubePublish.findFirst({ where: { id: publishId, userId: job.userId } }); if (!publish) throw new Error("Publish record not found");
     if (publish.status === "PUBLISHED") { await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date() } }); return NextResponse.json({ status: "PUBLISHED", publishId, youtubeVideoId: publish.youtubeVideoId }); }
-    await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "UPLOADING", error: null } }); uploadStarted = true;
     const access = await getValidYouTubeAccessToken(job.userId); const asset = await materializeVideoAsset(publish.assetRef, publish.id); file = asset.file;
     const tags = publish.tagsJson ? JSON.parse(publish.tagsJson) as string[] : [];
+    await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "UPLOADING", error: null } });
     uploadStarted = true;
     const videoId = await uploadYouTubeVideo(access.accessToken, { file, title: publish.title, description: publish.description, tags, privacyStatus: publish.privacyStatus });
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "PUBLISHED", youtubeVideoId: videoId, publishedAt: new Date(), error: null } });
