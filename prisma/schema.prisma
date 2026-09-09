@@ -1,36 +1,229 @@
-generator client { provider = "prisma-client-js" }
+generator client {
+  provider = "prisma-client-js"
+}
 
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
-  id String @id @default(cuid())
-  email String @unique
-  name String?
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
   passwordHash String
-  sessions Session[]
-  role Role @default(USER)
-  plan Plan @default(FREE)
-  credits Int @default(0)
-  createdAt DateTime @default(now())
-  projects Project[]
-  jobs Job[]
-  auditLogs AuditLog[]
-  youtube YouTubeConnection?
-  publishes YouTubePublish[]
+  sessions    Session[]
+  role        Role     @default(USER)
+  plan        Plan     @default(FREE)
+  credits     Int      @default(0)
+  createdAt   DateTime @default(now())
+  projects    Project[]
+  jobs        Job[]
+  auditLogs   AuditLog[]
+  youtube     YouTubeConnection?
+  publishes   YouTubePublish[]
 }
-model Session { id String @id @default(cuid()); userId String; tokenHash String @unique; expiresAt DateTime; createdAt DateTime @default(now()); lastUsedAt DateTime?; user User @relation(fields:[userId],references:[id],onDelete:Cascade); @@index([userId,expiresAt]) }
-model Project { id String @id @default(cuid()); userId String; user User @relation(fields:[userId],references:[id],onDelete:Cascade); title String; topic String; status ProjectStatus @default(DRAFT); createdAt DateTime @default(now()); updatedAt DateTime @updatedAt; jobs Job[]; sources ResearchSource[]; findings ResearchFinding[]; scripts ContentScript[]; assets MediaAsset[]; publishes YouTubePublish[] }
-model ResearchSource { id String @id @default(cuid()); projectId String; project Project @relation(fields:[projectId],references:[id],onDelete:Cascade); url String; title String?; publisher String?; fetchedAt DateTime @default(now()); contentHash String?; content String @db.Text; @@unique([projectId,url]); @@index([projectId,fetchedAt]) }
-model ResearchFinding { id String @id @default(cuid()); projectId String; project Project @relation(fields:[projectId],references:[id],onDelete:Cascade); sourceId String?; claim String; evidence String; confidence Float @default(0); createdAt DateTime @default(now()); @@index([projectId,createdAt]); @@index([sourceId]) }
-model ContentScript { id String @id @default(cuid()); projectId String @unique; project Project @relation(fields:[projectId],references:[id],onDelete:Cascade); hook String; title String; script String @db.Text; seoTitle String; description String @db.Text; tagsJson String; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }
-model MediaAsset { id String @id @default(cuid()); projectId String; project Project @relation(fields:[projectId],references:[id],onDelete:Cascade); type String; url String; provider String; mimeType String?; sceneIndex Int?; duration Float?; metadata String?; createdAt DateTime @default(now()); @@index([projectId,sceneIndex]) }
-model Job { id String @id @default(cuid()); userId String; projectId String?; user User @relation(fields:[userId],references:[id],onDelete:Cascade); project Project? @relation(fields:[projectId],references:[id],onDelete:Cascade); type String; status JobStatus @default(QUEUED); payload String; attempts Int @default(0); createdAt DateTime @default(now()); startedAt DateTime?; finishedAt DateTime?; error String?; @@index([userId,createdAt]); @@index([status,createdAt]) }
-model AuditLog { id String @id @default(cuid()); userId String?; user User? @relation(fields:[userId],references:[id],onDelete:SetNull); action String; resource String?; resourceId String?; success Boolean @default(true); ip String?; metadata String?; createdAt DateTime @default(now()); @@index([userId,createdAt]); @@index([action,createdAt]) }
-model RateLimit { id String @id; key String; bucket DateTime; count Int @default(0); @@index([key,bucket]) }
-model YouTubeConnection { id String @id @default(cuid()); userId String @unique; user User @relation(fields:[userId],references:[id],onDelete:Cascade); channelId String?; channelTitle String?; accessToken String?; refreshToken String; expiresAt DateTime?; scope String?; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }
-model YouTubePublish { id String @id @default(cuid()); userId String; projectId String?; idempotencyKey String; youtubeVideoId String?; status PublishStatus @default(QUEUED); title String; description String?; tagsJson String?; privacyStatus String @default("private"); assetRef String; error String?; createdAt DateTime @default(now()); publishedAt DateTime?; user User @relation(fields:[userId],references:[id],onDelete:Cascade); project Project? @relation(fields:[projectId],references:[id],onDelete:Cascade); @@unique([userId,idempotencyKey]); @@index([userId,createdAt]) }
-enum Role { USER ADMIN }
-enum Plan { FREE STARTER PRO BUSINESS }
-enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
-enum JobStatus { QUEUED RUNNING SUCCEEDED FAILED }
-enum PublishStatus { QUEUED UPLOADING PUBLISHED FAILED }
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Project {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  topic      String
+  status     ProjectStatus @default(DRAFT)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  jobs       Job[]
+  sources    ResearchSource[]
+  findings   ResearchFinding[]
+  scripts    ContentScript[]
+  assets     MediaAsset[]
+  publishes  YouTubePublish[]
+}
+
+model ResearchSource {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url         String
+  title       String?
+  publisher   String?
+  fetchedAt   DateTime @default(now())
+  contentHash String?
+  content     String   @db.Text
+
+  @@unique([projectId, url])
+  @@index([projectId, fetchedAt])
+}
+
+model ResearchFinding {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceId   String?
+  claim      String
+  evidence   String
+  confidence Float    @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([sourceId])
+}
+
+model ContentScript {
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hook        String
+  title       String
+  script      String   @db.Text
+  seoTitle    String
+  description String   @db.Text
+  tagsJson    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MediaAsset {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type       String
+  url        String
+  provider   String
+  mimeType   String?
+  sceneIndex Int?
+  duration   Float?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([projectId, sceneIndex])
+}
+
+model Job {
+  id         String    @id @default(cuid())
+  userId     String
+  projectId  String?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type       String
+  status     JobStatus @default(QUEUED)
+  payload    String
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  resource   String?
+  resourceId String?
+  success    Boolean  @default(true)
+  ip         String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+model RateLimit {
+  id      String   @id
+  key     String
+  bucket  DateTime
+  count   Int      @default(0)
+
+  @@index([key, bucket])
+}
+
+model YouTubeConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId    String?
+  channelTitle String?
+  accessToken  String?
+  refreshToken String
+  expiresAt    DateTime?
+  scope        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model YouTubePublish {
+  id             String        @id @default(cuid())
+  userId         String
+  projectId      String?
+  idempotencyKey String
+  youtubeVideoId String?
+  status         PublishStatus @default(QUEUED)
+  title          String
+  description    String?
+  tagsJson       String?
+  privacyStatus  String        @default("private")
+  assetRef       String
+  error          String?
+  createdAt      DateTime      @default(now())
+  publishedAt    DateTime?
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum ProjectStatus {
+  DRAFT
+  QUEUED
+  RESEARCHING
+  SCRIPTING
+  PRODUCING
+  COMPLETE
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum PublishStatus {
+  QUEUED
+  UPLOADING
+  PUBLISHED
+  FAILED
+}
