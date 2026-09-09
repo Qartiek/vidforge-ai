@@ -7,6 +7,7 @@ model User {
   email        String             @unique
   name         String?
   passwordHash String
+  sessions     Session[]
   role         Role               @default(USER)
   plan         Plan               @default(FREE)
   credits      Int                @default(0)
@@ -16,6 +17,17 @@ model User {
   auditLogs    AuditLog[]
   youtube      YouTubeConnection?
   publishes    YouTubePublish[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
 }
 
 model Project {
