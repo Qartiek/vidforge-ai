@@ -1,1 +1,1 @@
-export const appConfig={name:"VidForge AI",version:"0.1.0",plans:{starter:{priceInr:299,monthlyVideos:5},pro:{priceInr:799,monthlyVideos:25},business:{priceInr:1999,monthlyVideos:100}}};
+export const appConfig={name:"VidForge AI",version:"0.3.0",plans:{starter:{priceInr:299,monthlyVideos:5},pro:{priceInr:799,monthlyVideos:25},business:{priceInr:1999,monthlyVideos:100}}};
