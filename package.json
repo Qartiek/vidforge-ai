@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run build"
   },
   "dependencies": {
     "@prisma/client": "latest",
@@ -19,7 +21,8 @@
     "react": "latest",
     "react-dom": "latest",
     "stripe": "latest",
-    "zod": "latest"
+    "zod": "latest",
+    "openai": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
