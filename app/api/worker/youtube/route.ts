@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "UPLOADING", error: null } }); uploadStarted = true;
     const access = await getValidYouTubeAccessToken(job.userId); const asset = await materializeVideoAsset(publish.assetRef, publish.id); file = asset.file;
     const tags = publish.tagsJson ? JSON.parse(publish.tagsJson) as string[] : [];
+    uploadStarted = true;
     const videoId = await uploadYouTubeVideo(access.accessToken, { file, title: publish.title, description: publish.description, tags, privacyStatus: publish.privacyStatus });
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "PUBLISHED", youtubeVideoId: videoId, publishedAt: new Date(), error: null } });
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
