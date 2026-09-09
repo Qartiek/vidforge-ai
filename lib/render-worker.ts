@@ -1,5 +1,3 @@
-const MAX_BYTES = 2 * 1024 * 1024 * 1024;
-
 function required(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is not configured`);
@@ -34,11 +32,10 @@ export async function submitRender(request: RenderRequest) {
 
 export function validateRenderedAsset(url: string) {
   const u = new URL(url);
-  const configured = new URL(required("ASSET_STORAGE_HOST").includes("://") ? required("ASSET_STORAGE_HOST") : `https://${required("ASSET_STORAGE_HOST")}`);
+  const rawHost = required("ASSET_STORAGE_HOST");
+  const configured = new URL(rawHost.includes("://") ? rawHost : `https://${rawHost}`);
   if (u.protocol !== "https:" || u.hostname.toLowerCase() !== configured.hostname.toLowerCase()) {
     throw new Error("Rendered asset host is not allowed");
   }
   return u.toString();
 }
-
-export { MAX_BYTES };
