@@ -5,12 +5,13 @@ import { getValidYouTubeAccessToken, uploadYouTubeVideo } from "../../../../lib/
 import { materializeVideoAsset, removeMaterializedAsset } from "../../../../lib/asset-storage";
 export const runtime = "nodejs";
 const MAX_ATTEMPTS = 5;
+const STALE_AFTER_MS = 60 * 60 * 1000;
 function authorized(request: Request) { const expected = process.env.JOB_WORKER_SECRET; const supplied = request.headers.get("authorization"); return Boolean(expected && supplied === `Bearer ${expected}`); }
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => null) as { jobId?: string } | null; if (!body?.jobId || body.jobId.length > 128) return NextResponse.json({ error: "jobId is required" }, { status: 400 });
   const job = await db.job.findUnique({ where: { id: body.jobId } }); if (!job || job.type !== "YOUTUBE_PUBLISH") return NextResponse.json({ error: "YouTube publish job not found" }, { status: 404 });
-  if (job.status === "RUNNING" || job.status === "SUCCEEDED") return NextResponse.json({ status: job.status }); if (job.attempts >= MAX_ATTEMPTS) return NextResponse.json({ error: "Retry limit reached", status: job.status }, { status: 409 });
+  if (job.status === "RUNNING") {\n    if (!job.startedAt || Date.now() - job.startedAt.getTime() < STALE_AFTER_MS) return NextResponse.json({ status: job.status }, { status: 409 });\n    const recovered = await db.job.updateMany({ where: { id: job.id, status: "RUNNING", startedAt: job.startedAt }, data: { status: "QUEUED", finishedAt: null, error: "Stale worker lease recovered" } });\n    if (recovered.count !== 1) return NextResponse.json({ status: "RUNNING" }, { status: 409 });\n    const refreshed = await db.job.findUnique({ where: { id: job.id } });\n    if (!refreshed) return NextResponse.json({ error: "YouTube publish job not found" }, { status: 404 });\n  }\n  if (job.status === "SUCCEEDED") return NextResponse.json({ status: job.status }); if (job.attempts >= MAX_ATTEMPTS) return NextResponse.json({ error: "Retry limit reached", status: job.status }, { status: 409 });
   const claimed = await db.job.updateMany({ where: { id: job.id, status: "QUEUED", attempts: job.attempts }, data: { status: "RUNNING", attempts: { increment: 1 }, startedAt: new Date(), error: null } }); if (claimed.count !== 1) return NextResponse.json({ status: "RUNNING" }, { status: 409 });
   let file: string | undefined; let publishId: string | undefined; let uploadStarted = false;
   try {
