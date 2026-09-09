@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "../../../../lib/db";
-import { advancePipeline, type PipelinePayload } from "../../../../lib/pipeline";
+import { enqueuePipelineStage, advancePipeline, type PipelinePayload } from "../../../../lib/pipeline";
 
 export const runtime = "nodejs";
 
@@ -10,24 +10,19 @@ function authorized(request: Request) {
 }
 
 const STAGES = new Set(["voice", "visuals", "render", "thumbnail", "seo", "publish"]);
+const MAX_ATTEMPTS = 5;
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { jobId?: string } | null;
-  if (!body?.jobId || body.jobId.length > 128) {
-    return NextResponse.json({ error: "jobId is required" }, { status: 400 });
-  }
+  if (!body?.jobId || body.jobId.length > 128) return NextResponse.json({ error: "jobId is required" }, { status: 400 });
 
   const job = await db.job.findUnique({ where: { id: body.jobId } });
-  if (!job || !job.type.startsWith("pipeline:")) {
-    return NextResponse.json({ error: "Pipeline job not found" }, { status: 404 });
-  }
+  if (!job) return NextResponse.json({ error: "Pipeline job not found" }, { status: 404 });
   if (job.status === "SUCCEEDED") return NextResponse.json({ status: "SUCCEEDED", jobId: job.id });
   if (job.status === "RUNNING") return NextResponse.json({ status: "RUNNING", jobId: job.id }, { status: 409 });
-
-  const stage = job.type.slice("pipeline:".length);
-  if (!STAGES.has(stage)) return NextResponse.json({ error: "Unsupported pipeline stage" }, { status: 400 });
+  if (job.attempts >= MAX_ATTEMPTS) return NextResponse.json({ error: "Maximum attempts exceeded" }, { status: 409 });
 
   const claimed = await db.job.updateMany({
     where: { id: job.id, status: "QUEUED", attempts: job.attempts },
@@ -36,18 +31,33 @@ export async function POST(request: Request) {
   if (claimed.count !== 1) return NextResponse.json({ status: "RUNNING", jobId: job.id }, { status: 409 });
 
   try {
+    if (job.type === "production_pipeline") {
+      const raw = JSON.parse(job.payload) as { projectId?: string; scriptId?: string };
+      if (raw.projectId !== job.projectId || !raw.scriptId) throw new Error("Invalid production pipeline payload");
+      const stage = await enqueuePipelineStage(job.userId, {
+        projectId: raw.projectId,
+        scriptId: raw.scriptId,
+        stage: "voice",
+        previousJobId: job.id,
+      });
+      await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+      return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, nextJobId: stage.id, stage: "voice" });
+    }
+
+    if (!job.type.startsWith("pipeline:")) throw new Error("Unsupported pipeline job type");
+    const stage = job.type.slice("pipeline:".length);
+    if (!STAGES.has(stage)) throw new Error("Unsupported pipeline stage");
+
     const payload = JSON.parse(job.payload) as PipelinePayload;
     if (payload.projectId !== job.projectId || !payload.scriptId || payload.stage !== stage) {
       throw new Error("Invalid pipeline job payload");
     }
 
-    // Stage execution adapters will plug into this dispatcher. For now each
-    // stage is represented by a durable job and advances only after a worker
-    // invocation explicitly completes it; no fake media is generated.
+    // The stage is intentionally advanced only through the durable stage
+    // contract. Provider-specific media work is isolated from queue state.
     const next = await advancePipeline(job.id);
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
-
-    return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, nextJobId: next?.id ?? null });
+    return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, nextJobId: next?.id ?? null, stage });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pipeline stage failed";
     await db.job.update({ where: { id: job.id }, data: { status: "FAILED", finishedAt: new Date(), error: message.slice(0, 1000) } });
