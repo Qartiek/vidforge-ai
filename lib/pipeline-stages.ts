@@ -1,40 +1,21 @@
 import OpenAI from "openai";
 import { db } from "./db";
 import { synthesizeSpeech } from "./tts";
-import { generateContent } from "./content";
-import { type FinanceBrief } from "./finance";
+import { buildScriptPrompt, generateContent } from "./content";
+import { submitRender, validateRenderedAsset } from "./render-worker";
 
 const MAX_TEXT_CHUNK = 3800;
 function required(name: string) { const value = process.env[name]?.trim(); if (!value) throw new Error(`${name} is not configured`); return value; }
 function chunks(text: string) { const out: string[] = []; let remaining = text.trim(); while (remaining.length > MAX_TEXT_CHUNK) { const cut = remaining.lastIndexOf(" ", MAX_TEXT_CHUNK); const at = cut > 500 ? cut : MAX_TEXT_CHUNK; out.push(remaining.slice(0, at)); remaining = remaining.slice(at).trim(); } if (remaining) out.push(remaining); return out; }
-async function uploadBinary(bytes: Buffer, filename: string, mimeType: string) {
-  const form = new FormData(); form.append("file", new Blob([bytes], { type: mimeType }), filename);
-  const response = await fetch(required("ASSET_UPLOAD_URL"), { method: "POST", headers: { authorization: `Bearer ${required("ASSET_UPLOAD_SECRET")}` }, body: form, signal: AbortSignal.timeout(120000), cache: "no-store" });
-  if (!response.ok) throw new Error(`Asset upload failed (${response.status})`);
-  const body = await response.json().catch(() => null) as { url?: unknown } | null;
-  if (!body || typeof body.url !== "string") throw new Error("Asset upload response did not contain a URL");
-  return body.url;
-}
-async function runVoice(projectId: string, script: string) {
-  const parts = chunks(script); const urls: string[] = [];
-  for (let i = 0; i < parts.length; i += 1) { const audio = await synthesizeSpeech(parts[i]); const url = await uploadBinary(audio, `voice-${projectId}-${i}.mp3`, "audio/mpeg"); urls.push(url); await db.mediaAsset.create({ data: { projectId, type: "audio", url, provider: "openai-tts", mimeType: "audio/mpeg", sceneIndex: i, metadata: JSON.stringify({ part: i, parts: parts.length }) } }); }
-  return { urls };
-}
-async function runImage(projectId: string, prompt: string, type: "visual" | "thumbnail", sceneIndex?: number) {
-  const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
-  const result = await client.images.generate({ model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2", prompt: prompt.slice(0, 4000), size: "1536x1024", quality: process.env.OPENAI_IMAGE_QUALITY === "low" ? "low" : "medium" });
-  const item = result.data?.[0]; if (!item?.b64_json) throw new Error("Image provider returned no image data");
-  const url = await uploadBinary(Buffer.from(item.b64_json, "base64"), `${type}-${projectId}-${sceneIndex ?? 0}.png`, "image/png");
-  return db.mediaAsset.create({ data: { projectId, type, url, provider: "openai-image", mimeType: "image/png", sceneIndex: sceneIndex ?? null, metadata: JSON.stringify({ prompt: prompt.slice(0, 1000) }) } });
-}
-export async function executePipelineStage(stage: string, projectId: string, scriptId: string) {
-  const project = await db.project.findFirst({ where: { id: projectId }, include: { scripts: true, findings: true } });
-  if (!project || !project.scripts || project.scripts.id !== scriptId) throw new Error("Pipeline project/script mismatch");
+async function uploadBinary(bytes: Buffer, filename: string, mimeType: string) { const endpoint = required("ASSET_UPLOAD_URL"); const secret = required("ASSET_UPLOAD_SECRET"); const form = new FormData(); form.append("file", new Blob([bytes], { type: mimeType }), filename); const response = await fetch(endpoint, { method: "POST", headers: { authorization: `Bearer ${secret}` }, body: form, signal: AbortSignal.timeout(120000), cache: "no-store" }); if (!response.ok) throw new Error(`Asset upload failed (${response.status})`); const body = await response.json().catch(() => null) as { url?: unknown } | null; if (!body || typeof body.url !== "string") throw new Error("Asset upload response did not contain a URL"); return body.url; }
+async function runVoice(projectId: string, script: string) { const parts = chunks(script); const urls: string[] = []; for (let i = 0; i < parts.length; i += 1) { const audio = await synthesizeSpeech(parts[i]); const url = await uploadBinary(audio, `voice-${projectId}-${i}.mp3`, "audio/mpeg"); urls.push(url); await db.mediaAsset.create({ data: { projectId, type: "audio", url, provider: "openai-tts", mimeType: "audio/mpeg", sceneIndex: i, metadata: JSON.stringify({ part: i, parts: parts.length }) } }); } return { urls }; }
+async function runImage(projectId: string, prompt: string, type: "visual" | "thumbnail", sceneIndex?: number) { const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") }); const result = await client.images.generate({ model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2", prompt: prompt.slice(0, 4000), size: "1536x1024", quality: process.env.OPENAI_IMAGE_QUALITY === "low" ? "low" : "medium" }); const item = result.data?.[0]; if (!item?.b64_json) throw new Error("Image provider returned no image data"); const url = await uploadBinary(Buffer.from(item.b64_json, "base64"), `${type}-${projectId}-${sceneIndex ?? 0}.png`, "image/png"); const row = await db.mediaAsset.create({ data: { projectId, type, url, provider: "openai-image", mimeType: "image/png", sceneIndex: sceneIndex ?? null, metadata: JSON.stringify({ prompt: prompt.slice(0, 1000) }) } }); return row; }
+export async function executePipelineStage(stage: string, projectId: string, scriptId: string) { const project = await db.project.findFirst({ where: { id: projectId }, include: { scripts: true, findings: true, assets: true } }); if (!project || !project.scripts || project.scripts.id !== scriptId) throw new Error("Pipeline project/script mismatch");
   if (stage === "voice") return runVoice(projectId, project.scripts.script);
   if (stage === "visuals") { const sentences = project.scripts.script.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 12); const assets = []; for (let i = 0; i < sentences.length; i += 1) assets.push(await runImage(projectId, `Cinematic business documentary visual, no text, factual corporate finance context. Scene: ${sentences[i]}`, "visual", i)); return { assets: assets.map((asset) => asset.id) }; }
   if (stage === "thumbnail") { const asset = await runImage(projectId, `High click-through YouTube thumbnail for a serious business finance video about ${project.topic}. Bold visual hierarchy, premium financial news aesthetic, dramatic lighting, one clear focal subject, minimal or no text.`, "thumbnail"); return { assetId: asset.id }; }
-  if (stage === "seo") { const brief: FinanceBrief = { company: project.topic, angle: "SEO optimization", audience: "general business audience", durationMinutes: 8, language: "English" }; const research = project.findings.slice(0, 30).map((f) => `${f.claim}: ${f.evidence}`).join("\n") || project.scripts.script; const generated = await generateContent(brief, research); await db.contentScript.update({ where: { id: scriptId }, data: { seoTitle: generated.seoTitle, description: generated.description, tagsJson: generated.tags.join(",") } }); return { updated: true }; }
-  if (stage === "render") throw new Error("Render stage requires MEDIA_RENDER_URL and a dedicated media worker");
-  if (stage === "publish") throw new Error("Publish stage requires a rendered video asset and YouTube publish job");
+  if (stage === "seo") { const findings = project.findings.slice(0, 30).map((f) => `${f.claim}: ${f.evidence}`).join("\n"); const generated = await generateContent({ company: project.topic, angle: "SEO optimization", audience: "general business audience", durationMinutes: 8, language: "English" }, buildScriptPrompt({ company: project.topic, angle: "SEO optimization", audience: "general business audience", durationMinutes: 8, language: "English" }, findings || project.scripts.script)); await db.contentScript.update({ where: { id: scriptId }, data: { seoTitle: generated.seoTitle, description: generated.description, tagsJson: generated.tags.join(",") } }); return { updated: true }; }
+  if (stage === "render") { const visualAssets = project.assets.filter((a) => a.type === "visual" || a.type === "image" || a.type === "video").sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0)); const audioAssets = project.assets.filter((a) => a.type === "audio").sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0)); if (!visualAssets.length || !audioAssets.length) throw new Error("Render requires visual and voice assets"); const manifest = { version: 1, format: "mp4", width: 1920, height: 1080, fps: 30, scenes: visualAssets.map((a, i) => ({ index: a.sceneIndex ?? i, assetUrl: a.url })), audio: { source: "tts", urls: audioAssets.map((a) => a.url), codec: "aac" } }; const outputUrl = validateRenderedAsset(await submitRender({ projectId, manifest, audioUrls: audioAssets.map((a) => a.url), visualUrls: visualAssets.map((a) => a.url) })); const row = await db.mediaAsset.create({ data: { projectId, type: "video", url: outputUrl, provider: "render-worker", mimeType: "video/mp4", metadata: JSON.stringify({ rendered: true, manifestVersion: 1 }) } }); return { assetId: row.id, outputUrl }; }
+  if (stage === "publish") throw new Error("Publish requires a YouTube publish request; it is intentionally not auto-created without explicit publish intent");
   throw new Error(`Unsupported pipeline stage: ${stage}`);
 }
