@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { Plan } from "@prisma/client";
+import { Plan, Prisma } from "@prisma/client";
 import { db } from "../../../../lib/db";
 import { audit } from "../../../../lib/audit";
 import { getStripe } from "../../../../lib/stripe";
@@ -72,8 +72,16 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ received: true, ...(result === "duplicate" ? { duplicate: true } : {}) });
-  } catch {
-    await audit({ action: "STRIPE_WEBHOOK", resource: event.type, resourceId: event.id, success: false });
+  } catch (error) {
+    // Two concurrent deliveries can both pass the pre-check; the database
+    // unique constraint makes the audit insert the serialization point.
+    // Treat that race as an already-processed Stripe event so Stripe does not
+    // unnecessarily retry a webhook that has already been applied.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    await audit({ action: "STRIPE_WEBHOOK", resource: event.type, resourceId: event.id, success: false }).catch(() => undefined);
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }
