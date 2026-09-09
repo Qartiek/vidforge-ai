@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "../../../../../lib/auth";
+import { AuthenticationRequiredError, requireAuth } from "../../../../../lib/auth";
 import { audit } from "../../../../../lib/audit";
 import { getStripe, getStripePriceId } from "../../../../../lib/stripe";
 
@@ -9,7 +9,16 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const user = await requireAuth();
+  let user;
+  try {
+    user = await requireAuth();
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    }
+    throw error;
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid billing plan" }, { status: 400 });
