@@ -11,6 +11,13 @@ const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export type SessionUser = { id: string; email: string; name?: string | null; role: "USER" | "ADMIN" };
 
+export class AuthenticationRequiredError extends Error {
+  constructor() {
+    super("Authentication required");
+    this.name = "AuthenticationRequiredError";
+  }
+}
+
 function sessionCookieOptions() {
   return {
     httpOnly: true,
@@ -55,12 +62,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (expiresAt - now <= ROLLING_THRESHOLD) {
     const nextExpiry = new Date(now + TTL);
     await db.session.update({ where: { id: session.id }, data: { expiresAt: nextExpiry, lastUsedAt: new Date(now) } });
-    // Keep the browser cookie lifetime aligned with the rolling DB session.
     jar.set(COOKIE, token, sessionCookieOptions());
   } else {
     await db.session.update({ where: { id: session.id }, data: { lastUsedAt: new Date(now) } });
   }
   return session.user;
+}
+
+export async function requireAuth(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new AuthenticationRequiredError();
+  return user;
 }
 
 export async function registerUser(email: string, password: string, name?: string) {
