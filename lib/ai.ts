@@ -1,0 +1,3 @@
+import OpenAI from "openai";
+const apiKey=process.env.OPENAI_API_KEY;
+export async function generateJson<T>(system:string,user:string):Promise<T>{if(!apiKey)throw new Error("OPENAI_API_KEY is not configured");const client=new OpenAI({apiKey});const response=await client.chat.completions.create({model:process.env.OPENAI_MODEL||"gpt-4o-mini",temperature:0.2,response_format:{type:"json_object"},messages:[{role:"system",content:system},{role:"user",content:user}]});const text=response.choices[0]?.message?.content;if(!text)throw new Error("AI returned no content");try{return JSON.parse(text) as T}catch{throw new Error("AI returned invalid JSON");}}
