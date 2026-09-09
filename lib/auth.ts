@@ -11,18 +11,22 @@ const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export type SessionUser = { id: string; email: string; name?: string | null; role: "USER" | "ADMIN" };
 
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: TTL / 1000,
+  };
+}
+
 export async function createSession(user: SessionUser) {
   const token = randomBytes(32).toString("base64url");
   await db.session.create({
     data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + TTL) },
   });
-  (await cookies()).set(COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: TTL / 1000,
-  });
+  (await cookies()).set(COOKIE, token, sessionCookieOptions());
 }
 
 export async function clearSession() {
@@ -33,7 +37,8 @@ export async function clearSession() {
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const token = (await cookies()).get(COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
@@ -41,13 +46,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   });
   if (!session || session.expiresAt <= new Date()) {
     if (session) await db.session.delete({ where: { id: session.id } });
+    jar.delete(COOKIE);
     return null;
   }
 
   const now = Date.now();
   const expiresAt = session.expiresAt.getTime();
   if (expiresAt - now <= ROLLING_THRESHOLD) {
-    await db.session.update({ where: { id: session.id }, data: { expiresAt: new Date(now + TTL), lastUsedAt: new Date(now) } });
+    const nextExpiry = new Date(now + TTL);
+    await db.session.update({ where: { id: session.id }, data: { expiresAt: nextExpiry, lastUsedAt: new Date(now) } });
+    // Keep the browser cookie lifetime aligned with the rolling DB session.
+    jar.set(COOKIE, token, sessionCookieOptions());
   } else {
     await db.session.update({ where: { id: session.id }, data: { lastUsedAt: new Date(now) } });
   }
@@ -65,7 +74,10 @@ export async function registerUser(email: string, password: string, name?: strin
 }
 
 export async function loginUser(email: string, password: string) {
-  const user = await db.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = validEmail(normalizedEmail) && normalizedEmail.length <= 254
+    ? await db.user.findUnique({ where: { email: normalizedEmail } })
+    : null;
   if (!user || password.length > 128 || !(await bcrypt.compare(password, user.passwordHash))) throw new Error("Invalid credentials");
   return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
