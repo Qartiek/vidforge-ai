@@ -15,9 +15,9 @@ export async function POST(request:Request){
  try{
   const content=await generateJson<GeneratedContent>(buildContentPrompt(brief),JSON.stringify(brief));
   const project=await db.project.create({data:{userId:user.id,title:content.title.slice(0,180),topic:brief.topic,status:"COMPLETE"}});
-  await db.contentScript.create({data:{projectId:project.id,hook:content.hook,title:content.title,script:content.script,seoTitle:content.seoTitle,description:content.description,tagsJson:JSON.stringify(content.tags)}});
+  const script=await db.contentScript.create({data:{projectId:project.id,hook:content.hook,title:content.title,script:content.script,seoTitle:content.seoTitle,description:content.description,tagsJson:JSON.stringify(content.tags)}});
   const job=await db.job.create({data:{userId:user.id,projectId:project.id,type:"content_generation",status:"SUCCEEDED",payload:JSON.stringify({brief,content}),startedAt:new Date(),finishedAt:new Date()}});
   await db.auditLog.create({data:{userId:user.id,action:"CONTENT_GENERATED",resource:"Project",resourceId:project.id,success:true,metadata:JSON.stringify({jobId:job.id,platform:brief.platform,format:brief.format})}});
-  return NextResponse.json({projectId:project.id,jobId:job.id,status:"complete",brief,content});
+  return NextResponse.json({projectId:project.id,contentScriptId:script.id,jobId:job.id,status:"complete",brief,content});
  }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Generation failed"},{status:500});}
 }
