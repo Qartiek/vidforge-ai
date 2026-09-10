@@ -10,23 +10,25 @@ function authorized(request: Request) {
   return Boolean((cron && supplied === `Bearer ${cron}`) || (worker && supplied === `Bearer ${worker}`));
 }
 
-const ROUTES: Record<string, string> = {
-  production_pipeline: "/api/worker/pipeline",
-  YOUTUBE_PUBLISH: "/api/worker/youtube",
-  ANALYTICS_OPTIMIZATION: "/api/worker/analytics",
-};
+function routeFor(type: string) {
+  if (type === "production_pipeline" || type.startsWith("pipeline:")) return "/api/worker/pipeline";
+  if (type === "YOUTUBE_PUBLISH") return "/api/worker/youtube";
+  if (type === "ANALYTICS_OPTIMIZATION") return "/api/worker/analytics";
+  return null;
+}
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const jobs = await db.job.findMany({ where: { status: "QUEUED", type: { in: Object.keys(ROUTES) } }, orderBy: { createdAt: "asc" }, take: 5, select: { id: true, type: true } });
+  const jobs = await db.job.findMany({ where: { status: "QUEUED" }, orderBy: { createdAt: "asc" }, take: 5, select: { id: true, type: true } });
+  const runnable = jobs.filter((job) => routeFor(job.type));
   const origin = new URL(request.url).origin;
   const secret = process.env.JOB_WORKER_SECRET;
   if (!secret) return NextResponse.json({ error: "JOB_WORKER_SECRET is not configured" }, { status: 500 });
-  const results = await Promise.allSettled(jobs.map(async (job) => {
-    const response = await fetch(`${origin}${ROUTES[job.type]}`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ jobId: job.id }), cache: "no-store" });
+  const results = await Promise.allSettled(runnable.map(async (job) => {
+    const response = await fetch(`${origin}${routeFor(job.type)}`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ jobId: job.id }), cache: "no-store" });
     return { jobId: job.id, type: job.type, status: response.status, body: await response.json().catch(() => null) };
   }));
-  return NextResponse.json({ processed: jobs.length, results: results.map((result) => result.status === "fulfilled" ? result.value : { error: String(result.reason) }) });
+  return NextResponse.json({ processed: runnable.length, skipped: jobs.length - runnable.length, results: results.map((result) => result.status === "fulfilled" ? result.value : { error: String(result.reason) }) });
 }
 
 export async function GET(request: Request) { return POST(request); }
