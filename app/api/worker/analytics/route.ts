@@ -30,11 +30,11 @@ export async function POST(request: Request) {
     if (!publish || publish.status !== "PUBLISHED" || publish.youtubeVideoId !== payload.videoId) throw new Error("Published YouTube video not found");
     const snapshot = await fetchYouTubeAnalytics(job.userId, payload.videoId);
     const recommendations = createOptimizationRecommendations(snapshot);
-    const row = await db.youTubeAnalytics.create({ data: { userId: job.userId, projectId: job.projectId, publishId: publish.id, youtubeVideoId: snapshot.videoId, views: snapshot.views, likes: snapshot.likes, comments: snapshot.comments, watchTimeMinutes: snapshot.watchTimeMinutes, averageViewDurationSeconds: snapshot.averageViewDurationSeconds, averageViewPercentage: snapshot.averageViewPercentage, recommendationsJson: JSON.stringify(recommendations) } });
-    await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null, payload: JSON.stringify({ ...payload, analyticsId: row.id, snapshot, recommendations }) } });
+    const resultPayload = JSON.stringify({ ...payload, snapshot, recommendations, capturedAt: new Date().toISOString() });
+    await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null, payload: resultPayload } });
     if (job.projectId) await db.project.update({ where: { id: job.projectId }, data: { status: "COMPLETE" } });
-    await audit({ userId: job.userId, action: "YOUTUBE_ANALYTICS_CAPTURED", resource: "YOUTUBE_ANALYTICS", resourceId: row.id, metadata: { videoId: payload.videoId, views: snapshot.views } });
-    return NextResponse.json({ status: "SUCCEEDED", analyticsId: row.id, snapshot, recommendations });
+    await audit({ userId: job.userId, action: "YOUTUBE_ANALYTICS_CAPTURED", resource: "ANALYTICS_OPTIMIZATION", resourceId: job.id, metadata: { videoId: payload.videoId, views: snapshot.views, recommendations } });
+    return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, snapshot, recommendations });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Analytics collection failed";
     const retryable = job.attempts < MAX_ATTEMPTS;
