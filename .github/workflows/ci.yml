@@ -16,5 +16,17 @@ jobs:
       - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npx prisma --version
       - run: npx prisma generate
-      - run: npx tsc --noEmit
+      - name: TypeScript check
+        run: |
+          set +e
+          npx tsc --noEmit 2>&1 | tee tsc-errors.txt
+          status=${PIPESTATUS[0]}
+          exit $status
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-diagnostics
+          path: tsc-errors.txt
+          if-no-files-found: ignore
       - run: npm run build
