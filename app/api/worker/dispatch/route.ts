@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "../../../../lib/db";
+import { getSessionUser } from "../../../../lib/auth";
 
 export const runtime = "nodejs";
 
-function authorized(request: Request) {
+async function authorize(request: Request) {
   const cron = process.env.CRON_SECRET;
   const worker = process.env.JOB_WORKER_SECRET;
   const supplied = request.headers.get("authorization");
-  return Boolean((cron && supplied === `Bearer ${cron}`) || (worker && supplied === `Bearer ${worker}`));
+  if ((cron && supplied === `Bearer ${cron}`) || (worker && supplied === `Bearer ${worker}`)) return { userId: null as string | null };
+  const user = await getSessionUser();
+  return user ? { userId: user.id } : null;
 }
 
 function routeFor(type: string) {
@@ -18,8 +21,9 @@ function routeFor(type: string) {
 }
 
 export async function POST(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const jobs = await db.job.findMany({ where: { status: "QUEUED" }, orderBy: { createdAt: "asc" }, take: 5, select: { id: true, type: true } });
+  const auth = await authorize(request);
+  if (!auth) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  const jobs = await db.job.findMany({ where: { status: "QUEUED", ...(auth.userId ? { userId: auth.userId } : {}) }, orderBy: { createdAt: "asc" }, take: 3, select: { id: true, type: true } });
   const runnable = jobs.filter((job) => routeFor(job.type));
   const origin = new URL(request.url).origin;
   const secret = process.env.JOB_WORKER_SECRET;
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
     const response = await fetch(`${origin}${routeFor(job.type)}`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ jobId: job.id }), cache: "no-store" });
     return { jobId: job.id, type: job.type, status: response.status, body: await response.json().catch(() => null) };
   }));
-  return NextResponse.json({ processed: runnable.length, skipped: jobs.length - runnable.length, results: results.map((result) => result.status === "fulfilled" ? result.value : { error: String(result.reason) }) });
+  return NextResponse.json({ processed: runnable.length, results: results.map((result) => result.status === "fulfilled" ? result.value : { error: String(result.reason) }) });
 }
 
 export async function GET(request: Request) { return POST(request); }
