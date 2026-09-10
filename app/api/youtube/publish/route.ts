@@ -10,9 +10,9 @@ const schema = z.object({
   idempotencyKey: z.string().min(16).max(128).regex(/^[A-Za-z0-9._:-]+$/),
   title: z.string().trim().min(1).max(100),
   description: z.string().max(5000).optional(),
-  tags: z.array(z.string().trim().min(1).max(100)).max(30).optional(),
+  tags: z.array(z.string().trim().min(1).max(100)).optional(),
   privacyStatus: z.enum(["private", "unlisted", "public"]).default("private"),
-  assetRef: z.string().min(1).max(500).regex(/^[A-Za-z0-9._:/-]+$/),
+  assetRef: z.string().cuid(),
 });
 
 export async function POST(request: Request) {
@@ -30,9 +30,8 @@ export async function POST(request: Request) {
   const project = await db.project.findFirst({ where: { id: input.projectId, userId: user.id }, select: { id: true } });
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
-  // Never allow a caller to publish an arbitrary URL/reference. The asset must
-  // belong to the authenticated user's project, preventing cross-tenant asset
-  // access and turning this endpoint into an unintended proxy.
+  // Resolve the supplied asset ID inside the authenticated project. We then
+  // persist the trusted storage URL, never a caller-controlled URL.
   const asset = await db.mediaAsset.findFirst({
     where: { id: input.assetRef, projectId: project.id },
     select: { id: true, url: true },
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
           description: input.description,
           tagsJson: input.tags ? JSON.stringify(input.tags) : null,
           privacyStatus: input.privacyStatus,
-          assetRef: asset.id,
+          assetRef: asset.url,
         },
       });
       const job = await tx.job.create({
