@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const publish = await db.youTubePublish.findFirst({ where: { id: publishId, userId: job.userId } });
     if (!publish) throw new Error("Publish record not found");
     if (publish.status === "PUBLISHED" && publish.youtubeVideoId) {
-      const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? "", publish.id, publish.youtubeVideoId);
+      const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? null, publish.id, publish.youtubeVideoId);
       await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
       return NextResponse.json({ status: "PUBLISHED", publishId, youtubeVideoId: publish.youtubeVideoId, analyticsJobId: analyticsJob.id });
     }
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     uploadStarted = true;
     const videoId = await uploadYouTubeVideo(access.accessToken, { file, title: publish.title, description: publish.description, tags, privacyStatus: publish.privacyStatus });
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "PUBLISHED", youtubeVideoId: videoId, publishedAt: new Date(), error: null } });
-    const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? "", publish.id, videoId);
+    const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? null, publish.id, videoId);
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
     await audit({ userId: job.userId, action: "YOUTUBE_PUBLISHED", resource: "YOUTUBE_PUBLISH", resourceId: publish.id, metadata: { videoId, analyticsJobId: analyticsJob.id } });
     return NextResponse.json({ status: "PUBLISHED", publishId, youtubeVideoId: videoId, analyticsJobId: analyticsJob.id });
