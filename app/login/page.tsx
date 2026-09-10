@@ -1,3 +1,60 @@
 "use client";
-import {useState} from "react";import {useRouter} from "next/navigation";
-export default function Login(){const router=useRouter();const [email,setEmail]=useState(""),[password,setPassword]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError("");try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:email.trim().toLowerCase(),password}),cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok){setError(d.error||"Login failed");return;}router.replace("/dashboard");router.refresh();}catch{setError("Unable to reach the login service. Please try again.");}finally{setBusy(false);}}const input={width:"100%",marginTop:9,padding:"16px 17px",borderRadius:14,border:"1px solid rgba(148,163,184,.18)",background:"rgba(2,6,23,.72)",color:"#fff",outline:"none",fontSize:16,boxSizing:"border-box" as const};return <main style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"radial-gradient(circle at 20% 10%,rgba(99,102,241,.22),transparent 34%),radial-gradient(circle at 90% 85%,rgba(14,165,233,.18),transparent 35%),#030712",color:"#fff"}}><div style={{width:"100%",maxWidth:980,display:"grid",gridTemplateColumns:"1fr 430px",gap:34,alignItems:"center"}}><section style={{padding:18}}><div style={{fontSize:13,fontWeight:800,letterSpacing:3,color:"#a78bfa",marginBottom:18}}>VIDFORGE AI · GEN 7</div><h1 style={{fontSize:"clamp(42px,6vw,72px)",lineHeight:.98,letterSpacing:-3,margin:"0 0 22px",fontWeight:850}}>Create.<br/><span style={{background:"linear-gradient(90deg,#a78bfa,#38bdf8)",WebkitBackgroundClip:"text",color:"transparent"}}>Automate.</span><br/>Publish.</h1><p style={{maxWidth:540,color:"#94a3b8",fontSize:18,lineHeight:1.7}}>Your AI workspace for scripts, visuals, voiceovers, editing, SEO and YouTube automation.</p></section><form onSubmit={submit} style={{padding:30,borderRadius:28,border:"1px solid rgba(148,163,184,.18)",background:"linear-gradient(145deg,rgba(15,23,42,.9),rgba(2,6,23,.82))",boxShadow:"0 30px 90px rgba(0,0,0,.45)",backdropFilter:"blur(20px)"}}><div style={{fontSize:25,fontWeight:800,marginBottom:7}}>Welcome back</div><div style={{color:"#64748b",marginBottom:25}}>Sign in to your workspace.</div><label style={{fontSize:13,fontWeight:700}}>Email</label><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" style={input}/><label style={{display:"block",marginTop:18,fontSize:13,fontWeight:700}}>Password</label><input required minLength={8} type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" style={input}/>{error&&<p role="alert" style={{color:"#fb7185",fontSize:14,margin:"14px 0 0"}}>{error}</p>}<button disabled={busy} style={{width:"100%",marginTop:22,padding:16,border:0,borderRadius:14,color:"white",fontWeight:800,fontSize:16,cursor:"pointer",background:"linear-gradient(100deg,#8b5cf6,#2563eb)",boxShadow:"0 10px 35px rgba(99,102,241,.3)"}}>{busy?"Signing in…":"Sign in →"}</button><p style={{textAlign:"center",color:"#64748b",fontSize:14,marginTop:22}}>New to VidForge? <a href="/signup" style={{color:"#c4b5fd",fontWeight:800,textDecoration:"none"}}>Create account</a></p></form></div></main>
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function Login() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        cache: "no-store",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(d.error || "Unable to sign in. Check your details and try again.");
+        return;
+      }
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Connection failed. Please check your internet and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="auth-page">
+      <div className="auth-shell">
+        <section className="auth-copy">
+          <div className="auth-brand">VIDFORGE AI · GEN 7</div>
+          <h1 className="auth-title">Create.<br /><span className="auth-gradient">Automate.</span><br />Publish.</h1>
+          <p className="auth-subtitle">Your AI workspace for research, scripts, thumbnails, voiceovers, editing, SEO and multi-platform content automation.</p>
+        </section>
+        <form className="auth-card" onSubmit={submit}>
+          <h2>Welcome back</h2>
+          <p className="auth-muted">Sign in to your VidForge workspace.</p>
+          <label className="auth-label" htmlFor="email">Email</label>
+          <input id="email" className="auth-input" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+          <label className="auth-label" htmlFor="password">Password</label>
+          <input id="password" className="auth-input" required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          {error && <p className="auth-error" role="alert">{error}</p>}
+          <button className="auth-submit" disabled={busy}>{busy ? "Signing in…" : "Sign in →"}</button>
+          <p className="auth-switch">New to VidForge? <a className="auth-link" href="/signup">Create account</a></p>
+        </form>
+      </div>
+    </main>
+  );
+}
