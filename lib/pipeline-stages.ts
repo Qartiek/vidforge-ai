@@ -61,8 +61,11 @@ export async function executePipelineStage(stage: string, projectId: string, scr
     return { jobId: job.id, items: generated };
   }
   if (stage === "captions") {
-    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "CAPTIONS", status: "QUEUED", payload: JSON.stringify({ scriptId, source: script.script, provider: "transcription-required", note: "Caption timing must come from audio transcription; no synthetic timestamps are generated." }) } });
-    return { jobId: job.id, status: "queued", providerRequired: true };
+    // Captions are rendered from the final narration/script by the render worker.
+    // Do not create a separate orphan CAPTIONS job: there is no independent
+    // caption worker, and leaving one QUEUED would make the dashboard lie about
+    // production progress. The render manifest explicitly enables captions.
+    return { status: "ready", provider: "render-worker", source: "script", message: "Caption track will be generated during final render." };
   }
   if (stage === "editing" || stage === "render") {
     const visualAssets = project.assets.filter((a) => ["visual", "image", "video"].includes(a.type)).sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
@@ -79,16 +82,16 @@ export async function executePipelineStage(stage: string, projectId: string, scr
     return { jobId: job.id, ...check };
   }
   if (stage === "analytics") {
-    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "ANALYTICS_OPTIMIZATION", status: "QUEUED", payload: JSON.stringify({ objective: "Track CTR, retention, watch time and engagement after publication; generate optimization recommendations.", providerRequired: "YouTube Analytics API connection" }) } });
-    return { jobId: job.id, status: "queued", providerRequired: true };
+    // Analytics is a post-publication concern. The YouTube worker creates the
+    // correctly scoped analytics job after a successful upload, so this stage
+    // must never create an incomplete job before a YouTube video exists.
+    return { status: "deferred", message: "Analytics job is created automatically after successful YouTube publication." };
   }
   if (stage === "publish" || stage === "schedule_publish") {
     const video = [...project.assets].reverse().find((a) => a.type === "video" && a.mimeType === "video/mp4"); if (!video) throw new Error("Publish requires a rendered MP4 asset");
     const idempotencyKey = `pipeline:${projectId}:${video.id}`;
     const existing = await db.youTubePublish.findUnique({ where: { userId_idempotencyKey: { userId: project.userId, idempotencyKey } }, select: { id: true, status: true } }); if (existing) return { publishId: existing.id, status: existing.status, duplicate: true };
     const privacy = process.env.PIPELINE_YOUTUBE_PRIVACY === "public" ? "public" : process.env.PIPELINE_YOUTUBE_PRIVACY === "unlisted" ? "unlisted" : "private";
-    // Preparation only. The upload job is intentionally created by the explicit
-    // /api/pipeline/approve endpoint so no worker can publish without approval.
     const publish = await db.youTubePublish.create({ data: { userId: project.userId, projectId, idempotencyKey, title: script.title, description: script.description, tagsJson: script.tagsJson, privacyStatus: privacy, assetRef: video.url } });
     return { publishId: publish.id, status: publish.status, prepared: true };
   }
