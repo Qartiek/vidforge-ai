@@ -33,7 +33,7 @@ jobs:
         run: |
           curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${APP_URL%/}/api/worker/pipeline/run"
+            "${APP_URL%/}/api/worker/pipeline/run-v2"
 
       - name: Dispatch YouTube worker
         env:
