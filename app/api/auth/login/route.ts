@@ -19,13 +19,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many login attempts" }, { status: 429 });
   }
 
+  let user;
   try {
-    const user = await loginUser(email, body.password);
-    await createSession(user);
-    await audit({ userId: user.id, action: "AUTH_LOGIN", resource: "USER", resourceId: user.id, ip });
-    return NextResponse.json({ ok: true, user }, { headers: { "Cache-Control": "no-store" } });
+    user = await loginUser(email, body.password);
   } catch {
-    await audit({ action: "AUTH_LOGIN_FAILED", resource: "AUTH", success: false, ip });
+    try { await audit({ action: "AUTH_LOGIN_FAILED", resource: "AUTH", success: false, ip }); } catch {}
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
+
+  try {
+    await createSession(user);
+  } catch {
+    return NextResponse.json({ error: "Login service is temporarily unavailable. Please try again." }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+
+  try { await audit({ userId: user.id, action: "AUTH_LOGIN", resource: "USER", resourceId: user.id, ip }); } catch {}
+  return NextResponse.json({ ok: true, user }, { headers: { "Cache-Control": "no-store" } });
 }
