@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const recommendations = createOptimizationRecommendations(snapshot);
     const row = await db.youTubeAnalytics.create({ data: { userId: job.userId, projectId: job.projectId, publishId: publish.id, youtubeVideoId: snapshot.videoId, views: snapshot.views, likes: snapshot.likes, comments: snapshot.comments, watchTimeMinutes: snapshot.watchTimeMinutes, averageViewDurationSeconds: snapshot.averageViewDurationSeconds, averageViewPercentage: snapshot.averageViewPercentage, recommendationsJson: JSON.stringify(recommendations) } });
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null, payload: JSON.stringify({ ...payload, analyticsId: row.id, snapshot, recommendations }) } });
+    if (job.projectId) await db.project.update({ where: { id: job.projectId }, data: { status: "COMPLETE" } });
     await audit({ userId: job.userId, action: "YOUTUBE_ANALYTICS_CAPTURED", resource: "YOUTUBE_ANALYTICS", resourceId: row.id, metadata: { videoId: payload.videoId, views: snapshot.views } });
     return NextResponse.json({ status: "SUCCEEDED", analyticsId: row.id, snapshot, recommendations });
   } catch (error) {
