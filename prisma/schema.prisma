@@ -22,6 +22,7 @@ model User {
   auditLogs   AuditLog[]
   youtube     YouTubeConnection?
   publishes   YouTubePublish[]
+  analytics   YouTubeAnalytics[]
 }
 
 model Session {
@@ -32,7 +33,6 @@ model Session {
   createdAt  DateTime @default(now())
   lastUsedAt DateTime?
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId, expiresAt])
 }
 
@@ -51,6 +51,7 @@ model Project {
   scripts    ContentScript[]
   assets     MediaAsset[]
   publishes  YouTubePublish[]
+  analytics  YouTubeAnalytics[]
 }
 
 model ResearchSource {
@@ -63,7 +64,6 @@ model ResearchSource {
   fetchedAt   DateTime @default(now())
   contentHash String?
   content     String   @db.Text
-
   @@unique([projectId, url])
   @@index([projectId, fetchedAt])
 }
@@ -77,7 +77,6 @@ model ResearchFinding {
   evidence   String
   confidence Float    @default(0)
   createdAt  DateTime @default(now())
-
   @@index([projectId, createdAt])
   @@index([sourceId])
 }
@@ -108,7 +107,6 @@ model MediaAsset {
   duration   Float?
   metadata   String?
   createdAt  DateTime @default(now())
-
   @@index([projectId, sceneIndex])
 }
 
@@ -126,7 +124,6 @@ model Job {
   startedAt  DateTime?
   finishedAt DateTime?
   error      String?
-
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
@@ -142,10 +139,8 @@ model AuditLog {
   ip         String?
   metadata   String?
   createdAt  DateTime @default(now())
-
   @@index([userId, createdAt])
   @@index([action, createdAt])
-  @@unique([action, resourceId])
 }
 
 model RateLimit {
@@ -153,7 +148,6 @@ model RateLimit {
   key     String
   bucket  DateTime
   count   Int      @default(0)
-
   @@index([key, bucket])
 }
 
@@ -188,43 +182,34 @@ model YouTubePublish {
   publishedAt    DateTime?
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
+  analytics      YouTubeAnalytics[]
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
 }
 
-enum Role {
-  USER
-  ADMIN
+model YouTubeAnalytics {
+  id                          String         @id @default(cuid())
+  userId                      String
+  projectId                   String?
+  publishId                   String
+  youtubeVideoId              String
+  views                       Int            @default(0)
+  likes                       Int            @default(0)
+  comments                    Int            @default(0)
+  watchTimeMinutes            Float          @default(0)
+  averageViewDurationSeconds  Float          @default(0)
+  averageViewPercentage       Float          @default(0)
+  recommendationsJson        String?
+  fetchedAt                  DateTime       @default(now())
+  user                       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project                    Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publish                    YouTubePublish @relation(fields: [publishId], references: [id], onDelete: Cascade)
+  @@index([userId, fetchedAt])
+  @@index([publishId, fetchedAt])
 }
 
-enum Plan {
-  FREE
-  STARTER
-  PRO
-  BUSINESS
-}
-
-enum ProjectStatus {
-  DRAFT
-  QUEUED
-  RESEARCHING
-  SCRIPTING
-  PRODUCING
-  COMPLETE
-  FAILED
-}
-
-enum JobStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-}
-
-enum PublishStatus {
-  QUEUED
-  UPLOADING
-  PUBLISHED
-  FAILED
-}
+enum Role { USER ADMIN }
+enum Plan { FREE STARTER PRO BUSINESS }
+enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
+enum JobStatus { QUEUED RUNNING SUCCEEDED FAILED }
+enum PublishStatus { QUEUED UPLOADING PUBLISHED FAILED }
