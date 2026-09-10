@@ -208,8 +208,38 @@ model YouTubeAnalytics {
   @@index([publishId, fetchedAt])
 }
 
-enum Role { USER ADMIN }
-enum Plan { FREE STARTER PRO BUSINESS }
-enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
-enum JobStatus { QUEUED RUNNING SUCCEEDED FAILED }
-enum PublishStatus { QUEUED UPLOADING PUBLISHED FAILED }
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum ProjectStatus {
+  DRAFT
+  QUEUED
+  RESEARCHING
+  SCRIPTING
+  PRODUCING
+  COMPLETE
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum PublishStatus {
+  QUEUED
+  UPLOADING
+  PUBLISHED
+  FAILED
+}
