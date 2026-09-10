@@ -1,2 +1,72 @@
-import {redirect} from "next/navigation";import {getSessionUser} from "../../lib/auth";
-export default async function Dashboard(){const user=await getSessionUser();if(!user)redirect("/login");return <main className="container"><nav className="nav"><div className="logo">VidForge AI</div><span className="muted">{user.name||user.email}</span></nav><section style={{padding:"45px 0"}}><span className="badge">WORKSPACE</span><h1 style={{fontSize:42}}>Create your next video</h1><p className="muted">Company finance research → hook → script → production → YouTube.</p><div className="grid"><article className="card"><h3>Company Finance</h3><p className="muted">Research companies, verify sources and build a video workflow.</p><a className="cta" href="/create">Open Studio</a></article><article className="card"><h3>Production</h3><p className="muted">Manage voice, visuals, editing, thumbnail and SEO stages.</p><a className="cta" href="/production">Production Studio</a></article><article className="card"><h3>Jobs</h3><p className="muted">Track queued automation jobs.</p><a className="cta" href="/jobs">Job Center</a></article></div></section></main>}
+import { redirect } from "next/navigation";
+import { getSessionUser } from "../../lib/auth";
+
+const modules = [
+  ["01", "Research Engine", "Topics, trends, angles, sources and evidence.", "/research"],
+  ["02", "Hook + Script", "Hook-first retention structure, script and rewrites.", "/create"],
+  ["03", "Creative Studio", "Titles, thumbnails, visual concepts and packaging.", "/create"],
+  ["04", "Production", "Voice, visuals, captions, editing and render pipeline.", "/production"],
+  ["05", "SEO + Repurpose", "YouTube metadata plus Shorts, Reels and social variants.", "/content"],
+  ["06", "Publish + Schedule", "Quality gate, YouTube upload and scheduled publishing.", "/production"],
+  ["07", "Analytics", "Performance signals and optimization loop.", "/production"],
+  ["08", "Providers", "AI, storage, rendering and publishing integrations.", "/providers"],
+];
+
+export default async function Dashboard() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
+  return (
+    <main className="container">
+      <nav className="nav">
+        <a href="/dashboard" className="logo" style={{ textDecoration: "none" }}>VidForge AI</a>
+        <div className="nav-actions">
+          <span className="status-dot" /> COMMAND CENTER
+          <span className="muted">{user.name || user.email}</span>
+          <a className="nav-link" href="/jobs">Jobs</a>
+          <a className="nav-link" href="/pricing">Plans</a>
+        </div>
+      </nav>
+
+      <section className="studio-hero">
+        <span className="badge">✦ AUTONOMOUS CONTENT OPERATING SYSTEM</span>
+        <h1 className="section-title">From <span className="gradient-text">one idea</span> to a publish-ready content operation.</h1>
+        <p className="studio-subtitle">Research → Hook → Script → Creative → Voice → Visuals → Editing → Captions → SEO → Repurpose → Quality → Schedule → Publish → Analytics.</p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
+          <a className="cta" href="/create">Create with AI →</a>
+          <a className="cta" href="/research" style={{ background: "rgba(16,23,45,.8)", boxShadow: "none", border: "1px solid #2b3756" }}>Research first</a>
+        </div>
+      </section>
+
+      <section className="workspace">
+        <div className="workspace-head">
+          <div><span className="eyebrow">AI WORKFLOW</span><h2>All production modules</h2></div>
+          <span className="live-pill"><span /> System ready</span>
+        </div>
+        <div className="grid">
+          {modules.map(([number, title, description, href]) => (
+            <a key={title} href={href} className="card" style={{ textDecoration: "none", display: "block" }}>
+              <span className="badge">{number}</span>
+              <h3 style={{ fontSize: 19, marginTop: 16 }}>{title}</h3>
+              <p className="muted">{description}</p>
+              <span style={{ color: "#a99cff", fontWeight: 700 }}>Open module →</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="pipeline-panel" style={{ marginTop: 20 }}>
+        <div className="workspace-head">
+          <div><span className="eyebrow">DEFAULT AUTOPILOT</span><h2>Recommended flow</h2></div>
+          <strong>14 stages</strong>
+        </div>
+        <div className="pipeline-steps">
+          {["Idea", "Research", "Angle", "Hook + Script", "Title + Thumbnail", "Voice", "Visuals", "Editing", "Captions", "SEO", "Repurpose", "Quality", "Schedule + Publish", "Analytics"].map((x, i) => (
+            <span className="pipeline-step" key={x}>{i + 1}. {x}</span>
+          ))}
+        </div>
+        <p className="hint">Full Auto can run the workflow in the background. Publishing remains behind an explicit quality/approval gate unless a deployment policy intentionally enables autonomous publishing.</p>
+      </section>
+    </main>
+  );
+}
