@@ -37,26 +37,26 @@ export async function POST(request: Request) {
     if (payload.projectId !== job.projectId || !payload.scriptId || payload.stage !== stage) throw new Error("Invalid pipeline job payload");
 
     const result = await executePipelineStage(stage, payload.projectId, payload.scriptId);
+    const next = nextPipelineStage(stage);
     let nextJobId: string | null = null;
+    let awaitingApproval = false;
 
-    // Publishing is an explicit approval boundary. The publish stage prepares the
-    // publish record but never creates the upload job automatically.
-    if (stage === "publish") {
+    // Do not cross the publish boundary automatically. The existing approval
+    // endpoint is responsible for creating the YouTube upload job explicitly.
+    if (next === "publish") {
+      awaitingApproval = true;
       await db.project.update({ where: { id: payload.projectId }, data: { status: "PRODUCING" } });
+    } else if (next) {
+      const created = await enqueuePipelineStage(job.userId, { projectId: payload.projectId, scriptId: payload.scriptId, stage: next, previousJobId: job.id, metadata: { result } });
+      nextJobId = created.id;
+      if (next === "content") await db.project.update({ where: { id: payload.projectId }, data: { status: "SCRIPTING" } });
+      else if (["creative", "voice", "visuals", "editing", "captions", "seo", "repurpose", "quality", "analytics"].includes(next)) await db.project.update({ where: { id: payload.projectId }, data: { status: "PRODUCING" } });
     } else {
-      const next = nextPipelineStage(stage);
-      if (next) {
-        const created = await enqueuePipelineStage(job.userId, { projectId: payload.projectId, scriptId: payload.scriptId, stage: next, previousJobId: job.id, metadata: { result } });
-        nextJobId = created.id;
-        if (next === "content") await db.project.update({ where: { id: payload.projectId }, data: { status: "SCRIPTING" } });
-        else if (next === "voice" || next === "visuals" || next === "editing" || next === "captions" || next === "seo" || next === "repurpose" || next === "quality") await db.project.update({ where: { id: payload.projectId }, data: { status: "PRODUCING" } });
-      } else {
-        await db.project.update({ where: { id: payload.projectId }, data: { status: "COMPLETE" } });
-      }
+      await db.project.update({ where: { id: payload.projectId }, data: { status: "COMPLETE" } });
     }
 
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
-    return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, stage, nextJobId, result });
+    return NextResponse.json({ status: "SUCCEEDED", jobId: job.id, stage, nextJobId, awaitingApproval, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pipeline stage failed";
     const retryable = job.attempts < MAX_ATTEMPTS;
