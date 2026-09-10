@@ -3,6 +3,7 @@ import { db } from "./db";
 import { synthesizeSpeech } from "./tts";
 import { submitRender, validateRenderedAsset } from "./render-worker";
 import { generateRepurposedContent } from "./repurpose";
+import { runContentQualityChecks } from "./quality-engine";
 
 const MAX_TEXT_CHUNK = 3800;
 function required(name: string) { const value = process.env[name]?.trim(); if (!value) throw new Error(`${name} is not configured`); return value; }
@@ -31,40 +32,39 @@ async function runImage(projectId: string, prompt: string, type: "visual" | "thu
 }
 async function generateSeo(projectId: string, scriptId: string, topic: string, title: string, scriptText: string) {
   const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
-  const response = await client.chat.completions.create({
-    model: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
-    response_format: { type: "json_object" },
-    messages: [{ role: "system", content: "You are a YouTube SEO editor. Never invent facts." }, { role: "user", content: `Create SEO metadata for this video. Topic: ${topic}. Title: ${title}. Script: ${scriptText.slice(0, 18000)}. Return JSON with seoTitle, description, tags (array), hashtags (array), chapters (array of {time,title}).` }],
-  });
+  const response = await client.chat.completions.create({ model: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini", response_format: { type: "json_object" }, messages: [{ role: "system", content: "You are a YouTube SEO editor. Never invent facts." }, { role: "user", content: `Create SEO metadata for this video. Topic: ${topic}. Title: ${title}. Script: ${scriptText.slice(0, 18000)}. Return JSON with seoTitle, description, tags (array), hashtags (array), chapters (array of {time,title}).` }] });
   const raw = response.choices[0]?.message?.content; if (!raw) throw new Error("SEO model returned no content");
   const data = JSON.parse(raw) as { seoTitle?: string; description?: string; tags?: string[] };
   await db.contentScript.update({ where: { id: scriptId }, data: { seoTitle: String(data.seoTitle || title).slice(0, 180), description: String(data.description || "").slice(0, 12000), tagsJson: JSON.stringify(Array.isArray(data.tags) ? data.tags.slice(0, 50) : []) } });
   return data;
 }
+
 export async function executePipelineStage(stage: string, projectId: string, scriptId: string) {
   const project = await db.project.findFirst({ where: { id: projectId }, include: { scripts: true, findings: true, assets: true } });
   const script = project?.scripts[0]; if (!project || !script || script.id !== scriptId) throw new Error("Pipeline project/script mismatch");
+  if (stage === "research") return { status: "ready", findings: project.findings.length, message: project.findings.length ? "Stored research findings available for content generation." : "Research plan is ready; add verified sources for evidence-backed findings." };
+  if (stage === "content") return { status: "ready", scriptId: script.id, message: "Hook-led content package already generated." };
+  if (stage === "creative" || stage === "thumbnail" || stage === "title_thumbnail") {
+    const asset = await runImage(projectId, `High-click-through YouTube thumbnail for: ${project.topic}. Video title: ${script.title}. Strong visual hierarchy, one clear focal subject, emotionally compelling, premium modern creator aesthetic, high contrast, clean composition, minimal readable text only if useful, no logos or watermarks.`, "thumbnail");
+    return { assetId: asset.id };
+  }
   if (stage === "voice" || stage === "voiceover") return runVoice(projectId, script.script);
   if (stage === "visuals") {
     const sentences = script.script.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 12); const assets = [];
     for (let i = 0; i < sentences.length; i += 1) assets.push(await runImage(projectId, `Cinematic visual for a ${project.topic} video. Create a compelling, accurate scene inspired by this narration: ${sentences[i]}. No logos, no watermarks, no unnecessary text. Match the audience and tone of the source content.`, "visual", i));
     return { assets: assets.map((asset) => asset.id) };
   }
-  if (stage === "thumbnail" || stage === "title_thumbnail") {
-    const asset = await runImage(projectId, `High-click-through YouTube thumbnail for: ${project.topic}. Video title: ${script.title}. Strong visual hierarchy, one clear focal subject, emotionally compelling, premium modern creator aesthetic, high contrast, clean composition, minimal readable text only if useful, no logos or watermarks.`, "thumbnail");
-    return { assetId: asset.id };
-  }
   if (stage === "seo") return generateSeo(projectId, scriptId, project.topic, script.title, script.script);
-  if (stage === "shorts_reels") {
+  if (stage === "repurpose" || stage === "shorts_reels") {
     const generated = await generateRepurposedContent({ title: script.title, script: script.script, platforms: ["YouTube", "Instagram", "Facebook", "TikTok"], countPerPlatform: 3 });
-    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "SHORTS_REPURPOSE", status: "SUCCEEDED", payload: JSON.stringify({ items: generated }) , startedAt: new Date(), finishedAt: new Date() } });
+    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "SHORTS_REPURPOSE", status: "SUCCEEDED", payload: JSON.stringify({ items: generated }), startedAt: new Date(), finishedAt: new Date() } });
     return { jobId: job.id, items: generated };
   }
   if (stage === "captions") {
     const job = await db.job.create({ data: { userId: project.userId, projectId, type: "CAPTIONS", status: "QUEUED", payload: JSON.stringify({ scriptId, source: script.script }) } });
     return { jobId: job.id, status: "queued" };
   }
-  if (stage === "render" || stage === "editing") {
+  if (stage === "editing" || stage === "render") {
     const visualAssets = project.assets.filter((a) => ["visual", "image", "video"].includes(a.type)).sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
     const audioAssets = project.assets.filter((a) => a.type === "audio").sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
     if (!visualAssets.length || !audioAssets.length) throw new Error("Render requires visual and voice assets");
@@ -72,6 +72,15 @@ export async function executePipelineStage(stage: string, projectId: string, scr
     const outputUrl = validateRenderedAsset(await submitRender({ projectId, manifest, audioUrls: audioAssets.map((a) => a.url), visualUrls: visualAssets.map((a) => a.url) }));
     const row = await db.mediaAsset.create({ data: { projectId, type: "video", url: outputUrl, provider: "render-worker", mimeType: "video/mp4", metadata: JSON.stringify({ rendered: true, manifestVersion: 2, captions: true }) } });
     return { assetId: row.id, outputUrl };
+  }
+  if (stage === "quality") {
+    const check = runContentQualityChecks({ title: script.title, script: script.script, description: script.description });
+    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "QUALITY_CHECK", status: "SUCCEEDED", payload: JSON.stringify(check), startedAt: new Date(), finishedAt: new Date() } });
+    return { jobId: job.id, ...check };
+  }
+  if (stage === "analytics") {
+    const job = await db.job.create({ data: { userId: project.userId, projectId, type: "ANALYTICS_OPTIMIZATION", status: "QUEUED", payload: JSON.stringify({ objective: "Track CTR, retention, watch time and engagement after publication; generate optimization recommendations." }) } });
+    return { jobId: job.id, status: "queued" };
   }
   if (stage === "publish" || stage === "schedule_publish") {
     const video = [...project.assets].reverse().find((a) => a.type === "video" && a.mimeType === "video/mp4"); if (!video) throw new Error("Publish requires a rendered MP4 asset");
