@@ -1,11 +1,18 @@
-import {NextResponse} from "next/server";
-import {buildContentPrompt} from "../../../lib/content-engine";
+import { NextResponse } from "next/server";
+import { getSessionUser } from "../../../lib/auth";
+import { rateLimit } from "../../../lib/rate-limit";
+import { buildContentPrompt } from "../../../lib/content-engine";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
+  const rl = await rateLimit(`content-blueprint:${user.id}`, 30, 3600);
+  if (!rl.allowed) return NextResponse.json({ error: "Content blueprint rate limit exceeded", resetAt: rl.resetAt }, { status: 429 });
+
+  const body = await request.json().catch(() => null);
   if (typeof body?.topic !== "string" || !body.topic.trim()) {
-    return NextResponse.json({error: "topic is required"}, {status: 400});
+    return NextResponse.json({ error: "topic is required" }, { status: 400 });
   }
 
   const brief = {
@@ -37,5 +44,5 @@ export async function POST(request: Request) {
       "analytics_optimize",
     ],
     prompt: buildContentPrompt(brief),
-  }, {status: 202});
+  }, { status: 202 });
 }
