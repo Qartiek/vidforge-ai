@@ -13,7 +13,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid registration data" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Use a valid email and a password of at least 12 characters." }, { status: 400 });
 
   const email = parsed.data.email.trim().toLowerCase();
   const [ipRl, emailRl] = await Promise.all([
@@ -24,15 +24,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many registration attempts" }, { status: 429 });
   }
 
+  let user;
   try {
-    const user = await registerUser(email, parsed.data.password, parsed.data.name);
-    await createSession(user);
-    await audit({ userId: user.id, action: "AUTH_REGISTER", resource: "USER", resourceId: user.id, ip });
-    return NextResponse.json({ user }, { status: 201 });
+    user = await registerUser(email, parsed.data.password, parsed.data.name);
   } catch {
-    // Do not disclose whether an email already exists; this also handles the
-    // database unique constraint race when two registrations arrive together.
-    await audit({ action: "AUTH_REGISTER_FAILED", resource: "AUTH", success: false, ip });
-    return NextResponse.json({ error: "Unable to create account" }, { status: 409 });
+    try { await audit({ action: "AUTH_REGISTER_FAILED", resource: "AUTH", success: false, ip }); } catch {}
+    return NextResponse.json({ error: "Unable to create account. The email may already be registered." }, { status: 409 });
   }
+
+  try {
+    await createSession(user);
+  } catch {
+    return NextResponse.json({ error: "Account was created, but login is temporarily unavailable. Please sign in again shortly." }, { status: 503 });
+  }
+
+  try { await audit({ userId: user.id, action: "AUTH_REGISTER", resource: "USER", resourceId: user.id, ip }); } catch {}
+  return NextResponse.json({ user }, { status: 201 });
 }
