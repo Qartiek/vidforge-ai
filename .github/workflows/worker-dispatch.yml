@@ -43,3 +43,12 @@ jobs:
           curl --fail --silent --show-error --max-time 30 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${APP_URL%/}/api/worker/youtube/run"
+
+      - name: Dispatch analytics worker
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL%/}/api/worker/analytics/run"
