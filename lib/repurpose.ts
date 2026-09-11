@@ -1,13 +1,41 @@
-import OpenAI from "openai";
+export type RepurposeInput = {
+  title: string;
+  script: string;
+  platforms: string[];
+  countPerPlatform: number;
+};
 
-function required(name:string){const value=process.env[name]?.trim();if(!value)throw new Error(`${name} is not configured`);return value;}
-export type RepurposeInput={title:string;script:string;platforms:string[];countPerPlatform?:number};
-export async function generateRepurposedContent(input:RepurposeInput){
- const client=new OpenAI({apiKey:required("OPENAI_API_KEY")});
- const count=Math.min(Math.max(input.countPerPlatform??5,1),10);
- const platforms=input.platforms.filter(Boolean).slice(0,8);
- const prompt=`You are VidForge AI's platform repurposing engine. Convert the source into native short-form content. The hook MUST remain inside the opening of every final script. Do not invent unsupported facts. Adapt pacing, CTA, caption and hashtags to each platform. Supported platforms: YouTube, Instagram, Facebook, TikTok, LinkedIn, X. Return strict JSON only: {"items":[{"platform":"...","format":"Short|Reel|Video|Post","hook":"...","script":"...","caption":"...","hashtags":["..."]}]}. Create ${count} items per requested platform. Requested platforms: ${platforms.join(", ")}. Source title: ${input.title}. Source script:\n${input.script.slice(0,18000)}`;
- const response=await client.chat.completions.create({model:process.env.OPENAI_TEXT_MODEL||"gpt-4o-mini",response_format:{type:"json_object"},messages:[{role:"system",content:"You are a high-quality multi-platform content repurposing engine."},{role:"user",content:prompt}]});
- const raw=response.choices[0]?.message?.content;if(!raw)throw new Error("Repurposing model returned no content");
- const parsed=JSON.parse(raw) as {items?:unknown};if(!Array.isArray(parsed.items))throw new Error("Repurposing response is invalid");return parsed.items;
+export type RepurposedContent = {
+  platform: string;
+  items: Array<{ type: string; content: string; hook: string; cta: string }[]>;
+};
+
+export async function generateRepurposedContent(input: RepurposeInput): Promise<RepurposedContent[]> {
+  const { default: OpenAI } = await import("openai");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const client = new OpenAI({ apiKey });
+  const response = await client.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a content repurposing specialist. Create platform-optimized versions of long-form content for shorts, reels, and clips.",
+      },
+      {
+        role: "user",
+        content: `Long-form title: ${input.title}\nScript excerpt: ${input.script.slice(0, 1000)}\n\nCreate ${input.countPerPlatform} short-form clips for each of these platforms: ${input.platforms.join(", ")}. Each should have a hook, content excerpt, and CTA. Return valid JSON with platform name as keys, each containing array of items with type, content, hook, and cta.`,
+      },
+    ],
+  });
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Repurposing AI returned no content");
+  try {
+    const parsed = JSON.parse(text) as Record<string, Array<{ type: string; content: string; hook: string; cta: string }>>;
+    return Object.entries(parsed).map(([platform, items]) => ({ platform, items: [items] }));
+  } catch {
+    throw new Error("Repurposing AI returned invalid JSON");
+  }
 }

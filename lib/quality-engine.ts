@@ -1,35 +1,69 @@
-export type QualityReport = {
-  score: number;
-  checks: { name: string; status: "pass" | "warn"; detail: string }[];
-  ready: boolean;
+export type QualityCheckInput = {
+  title: string;
+  script: string;
+  description: string;
 };
 
-export function runContentQualityChecks(input: {
-  title?: string;
-  script?: string;
-  description?: string;
-  tags?: string[];
-}): QualityReport {
-  const script = input.script?.trim() || "";
-  const title = input.title?.trim() || "";
-  const description = input.description?.trim() || "";
-  const tags = Array.isArray(input.tags) ? input.tags.filter(Boolean) : [];
-  const opening = script.slice(0, 900);
-  const ending = script.slice(-1400);
+export type QualityCheckResult = {
+  passed: boolean;
+  score: number;
+  issues: Array<{ level: "error" | "warning" | "info"; message: string }>;
+  recommendations: string[];
+};
 
-  const checks: QualityReport["checks"] = [
-    { name: "Title present", status: title ? "pass" : "warn", detail: title ? "Title is available" : "Title is missing" },
-    { name: "Script present", status: script.length > 120 ? "pass" : "warn", detail: script.length > 120 ? "Script has usable length" : "Script is missing or too short" },
-    { name: "Hook in opening", status: /why|imagine|here's|heres|today|you('re| are)|most people|the truth|what if/i.test(opening) ? "pass" : "warn", detail: "Opening should establish a strong, honest reason to keep watching" },
-    { name: "Retention structure", status: /but|however|next|first|then|finally|here's why|the problem/i.test(script) ? "pass" : "warn", detail: "Script should contain transitions or retention beats" },
-    { name: "CTA", status: /subscribe|follow|comment|share|learn more|check out/i.test(ending) ? "pass" : "warn", detail: "A natural CTA is recommended near the ending" },
-    { name: "Description", status: description.length > 40 ? "pass" : "warn", detail: description.length > 40 ? "Description is available" : "Description is missing or too short" },
-    { name: "Tags", status: tags.length >= 3 ? "pass" : "warn", detail: tags.length >= 3 ? `${tags.length} tags available` : "Add at least 3 relevant tags" },
-    { name: "Verification safety", status: /\[VERIFY\]/i.test(script) ? "warn" : "pass", detail: /\[VERIFY\]/i.test(script) ? "Some claims require verification" : "No explicit verification flags" },
-    { name: "Safety / manipulation", status: /guaranteed|100% guaranteed|secret hack that always|instant money/i.test(script) ? "warn" : "pass", detail: /guaranteed|100% guaranteed|secret hack that always|instant money/i.test(script) ? "Potentially misleading certainty detected" : "No obvious certainty/manipulation phrase detected" },
-  ];
+export function runContentQualityChecks(input: QualityCheckInput): QualityCheckResult {
+  const issues: Array<{ level: "error" | "warning" | "info"; message: string }> = [];
+  let score = 100;
 
-  const passed = checks.filter((x) => x.status === "pass").length;
-  const score = Math.round((passed / checks.length) * 100);
-  return { score, checks, ready: score >= 80 && !checks.some((x) => x.name === "Verification safety" && x.status === "warn") };
+  // Title checks
+  if (input.title.length < 10) {
+    issues.push({ level: "error", message: "Title is too short (minimum 10 characters)" });
+    score -= 20;
+  }
+  if (input.title.length > 100) {
+    issues.push({ level: "warning", message: "Title exceeds 100 characters and may be truncated on YouTube" });
+    score -= 10;
+  }
+  if (!/[A-Z]/.test(input.title)) {
+    issues.push({ level: "warning", message: "Title has no capital letters" });
+    score -= 5;
+  }
+
+  // Script checks
+  if (input.script.length < 50) {
+    issues.push({ level: "error", message: "Script is too short (minimum 50 characters)" });
+    score -= 20;
+  }
+  const hookPattern = /^[^.!?]{20,}/;
+  if (!hookPattern.test(input.script)) {
+    issues.push({ level: "warning", message: "Script may lack a strong opening hook" });
+    score -= 15;
+  }
+  const allCaps = (input.script.match(/[A-Z]{10,}/g) || []).length;
+  if (allCaps > 0) {
+    issues.push({ level: "info", message: `Script contains ${allCaps} passages in all caps (consider varying case)` });
+  }
+
+  // Description checks
+  if (input.description.length < 50) {
+    issues.push({ level: "warning", message: "Description is short. Aim for 200+ characters to improve SEO." });
+    score -= 10;
+  }
+  if (input.description.length > 5000) {
+    issues.push({ level: "warning", message: "Description exceeds 5000 bytes" });
+    score -= 5;
+  }
+
+  const recommendations: string[] = [];
+  if (score < 50) recommendations.push("Review critical issues before publishing.");
+  if (!/[?!]$/.test(input.script)) recommendations.push("Consider ending the script with a question or exclamation for stronger CTA.");
+  if (!/(subscribe|like|comment|share|check|link)/i.test(input.description))
+    recommendations.push("Add a clear call-to-action in the description.");
+
+  return {
+    passed: score >= 60,
+    score: Math.max(0, score),
+    issues,
+    recommendations,
+  };
 }
