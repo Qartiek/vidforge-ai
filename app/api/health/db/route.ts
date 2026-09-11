@@ -17,6 +17,7 @@ export async function GET() {
       database: "connected",
       schema: "ready",
       tables: { users, sessions, rateLimits },
+      build: "db-health-v2",
     });
   } catch (error) {
     const e = error as { code?: string; message?: string; name?: string };
@@ -32,6 +33,7 @@ export async function GET() {
         database: "unavailable",
         errorCode: e?.code ?? "UNKNOWN",
         errorName: e?.name ?? "Error",
+        build: "db-health-v2",
       },
       { status: 503 },
     );
