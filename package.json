@@ -3,9 +3,9 @@
   "version": "0.5.0",
   "private": true,
   "allowScripts": {
-    "@prisma/client@6.19.3": true,
-    "prisma@6.19.3": true,
-    "@prisma/engines@6.19.3": true
+    "@prisma/client": true,
+    "prisma": true,
+    "@prisma/engines": true
   },
   "scripts": {
     "dev": "next dev",
