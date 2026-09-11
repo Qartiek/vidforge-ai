@@ -2,14 +2,49 @@ import { NextResponse } from "next/server";
 import { db } from "../../../lib/db";
 
 export const runtime = "nodejs";
-const CRON_SECRET = process.env.CRON_SECRET;
+export const dynamic = "force-dynamic";
 
-function authorized(request: Request) {
-  const supplied = request.headers.get("authorization");
-  return Boolean(CRON_SECRET && supplied === `Bearer ${CRON_SECRET}`);
-}
+const noStore = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 
-export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ status: "ok", uptime: process.uptime() });
+export async function GET() {
+  const databaseConfigured = Boolean(process.env.DATABASE_URL);
+
+  if (!databaseConfigured) {
+    return NextResponse.json(
+      {
+        ok: false,
+        service: "vidforge-ai",
+        status: "degraded",
+        checks: { databaseConfigured: false, databaseReachable: false },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503, headers: noStore },
+    );
+  }
+
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return NextResponse.json(
+      {
+        ok: true,
+        service: "vidforge-ai",
+        status: "ready",
+        checks: { databaseConfigured: true, databaseReachable: true },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200, headers: noStore },
+    );
+  } catch (error) {
+    console.error("HEALTH_DATABASE_FAILED", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        service: "vidforge-ai",
+        status: "degraded",
+        checks: { databaseConfigured: true, databaseReachable: false },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503, headers: noStore },
+    );
+  }
 }
