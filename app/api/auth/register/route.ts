@@ -4,6 +4,9 @@ import { registerUser, createSession } from "../../../../lib/auth";
 import { rateLimit } from "../../../../lib/rate-limit";
 import { audit } from "../../../../lib/audit";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const schema = z.object({
   email: z.string().trim().email().max(254),
   password: z.string().min(8).max(128),
@@ -16,7 +19,10 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Enter a valid email and a password of at least 8 characters." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Enter a valid email and a password of at least 8 characters." },
+      { status: 400 },
+    );
   }
 
   const email = parsed.data.email.toLowerCase();
@@ -28,7 +34,10 @@ export async function POST(request: Request) {
     ]);
 
     if (!ipRl.allowed || !emailRl.allowed) {
-      return NextResponse.json({ error: "Too many signup attempts. Please try again later." }, { status: 429 });
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please try again later." },
+        { status: 429 },
+      );
     }
 
     let user;
@@ -37,7 +46,10 @@ export async function POST(request: Request) {
     } catch (error) {
       const code = (error as { code?: string })?.code;
       if (code === "P2002") {
-        return NextResponse.json({ error: "This email is already registered. Please sign in instead." }, { status: 409 });
+        return NextResponse.json(
+          { error: "This email is already registered. Please sign in instead." },
+          { status: 409 },
+        );
       }
       throw error;
     }
@@ -55,6 +67,18 @@ export async function POST(request: Request) {
       ip,
       metadata: { code: (error as { code?: string })?.code ?? "UNKNOWN" },
     });
-    return NextResponse.json({ error: "Signup service is temporarily unavailable. Please try again in a moment." }, { status: 503 });
+
+    const code = (error as { code?: string })?.code;
+    if (code === "P2021" || code === "P1001" || code === "P1002" || code === "P1017") {
+      return NextResponse.json(
+        { error: "Database is not connected. Configure the production DATABASE_URL and redeploy." },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Unable to create your account right now. Please try again." },
+      { status: 503 },
+    );
   }
 }
