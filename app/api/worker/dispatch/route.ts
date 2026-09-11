@@ -1,44 +1,38 @@
 import { NextResponse } from "next/server";
 import { db } from "../../../../lib/db";
+import { getSessionUser } from "../../../../lib/auth";
 
 export const runtime = "nodejs";
-const CRON_SECRET = process.env.CRON_SECRET;
 
-function authorized(request: Request) {
+async function authorize(request: Request) {
+  const cron = process.env.CRON_SECRET;
+  const worker = process.env.JOB_WORKER_SECRET;
   const supplied = request.headers.get("authorization");
-  return Boolean(CRON_SECRET && supplied === `Bearer ${CRON_SECRET}`);
+  if ((cron && supplied === `Bearer ${cron}`) || (worker && supplied === `Bearer ${worker}`)) return { userId: null as string | null };
+  const user = await getSessionUser();
+  return user ? { userId: user.id } : null;
+}
+
+function routeFor(type: string) {
+  if (type === "production_pipeline" || type.startsWith("pipeline:")) return "/api/worker/pipeline";
+  if (type === "YOUTUBE_PUBLISH") return "/api/worker/youtube";
+  if (type === "ANALYTICS_OPTIMIZATION") return "/api/worker/analytics";
+  return null;
 }
 
 export async function POST(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  try {
-    const pipelineJobs = await db.job.findMany({
-      where: { status: "QUEUED", type: { startsWith: "pipeline" } },
-      orderBy: { createdAt: "asc" },
-      take: 50,
-    });
-    const youtubeJobs = await db.job.findMany({
-      where: { status: "QUEUED", type: "YOUTUBE_PUBLISH" },
-      orderBy: { createdAt: "asc" },
-      take: 10,
-    });
-    const analyticsJobs = await db.job.findMany({
-      where: { status: "QUEUED", type: "ANALYTICS_OPTIMIZATION" },
-      orderBy: { createdAt: "asc" },
-      take: 10,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      dispatched: {
-        pipeline: pipelineJobs.length,
-        youtube: youtubeJobs.length,
-        analytics: analyticsJobs.length,
-      },
-    });
-  } catch (error) {
-    console.error("WORKER_DISPATCH_FAILED", error);
-    return NextResponse.json({ error: "Worker dispatch failed" }, { status: 500 });
-  }
+  const auth = await authorize(request);
+  if (!auth) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  const jobs = await db.job.findMany({ where: { status: "QUEUED", ...(auth.userId ? { userId: auth.userId } : {}) }, orderBy: { createdAt: "asc" }, take: 3, select: { id: true, type: true } });
+  const runnable = jobs.filter((job) => routeFor(job.type));
+  const origin = new URL(request.url).origin;
+  const secret = process.env.JOB_WORKER_SECRET;
+  if (!secret) return NextResponse.json({ error: "JOB_WORKER_SECRET is not configured" }, { status: 500 });
+  const results = await Promise.allSettled(runnable.map(async (job) => {
+    const response = await fetch(`${origin}${routeFor(job.type)}`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ jobId: job.id }), cache: "no-store" });
+    return { jobId: job.id, type: job.type, status: response.status, body: await response.json().catch(() => null) };
+  }));
+  return NextResponse.json({ processed: runnable.length, results: results.map((result) => result.status === "fulfilled" ? result.value : { error: String(result.reason) }) });
 }
+
+export async function GET(request: Request) { return POST(request); }
