@@ -7,11 +7,18 @@ import { audit } from "../../../../lib/audit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const noStore = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 const schema = z.object({
   email: z.string().trim().email().max(254),
   password: z.string().min(8).max(128),
   name: z.string().trim().min(1).max(80).optional(),
 });
+
+function databaseError(error: unknown) {
+  const code = (error as { code?: string })?.code;
+  return ["P1001", "P1002", "P1017", "P2021", "P2022"].includes(code ?? "") ||
+    (error instanceof Error && /DATABASE_URL|Can't reach database|database server/i.test(error.message));
+}
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
@@ -21,11 +28,18 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Enter a valid email and a password of at least 8 characters." },
-      { status: 400 },
+      { status: 400, headers: noStore },
     );
   }
 
   const email = parsed.data.email.toLowerCase();
+
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Database is not configured for this deployment. Add the production DATABASE_URL in Vercel and redeploy." },
+      { status: 503, headers: noStore },
+    );
+  }
 
   try {
     const [ipRl, emailRl] = await Promise.all([
@@ -36,7 +50,7 @@ export async function POST(request: Request) {
     if (!ipRl.allowed || !emailRl.allowed) {
       return NextResponse.json(
         { error: "Too many signup attempts. Please try again later." },
-        { status: 429 },
+        { status: 429, headers: noStore },
       );
     }
 
@@ -48,7 +62,7 @@ export async function POST(request: Request) {
       if (code === "P2002") {
         return NextResponse.json(
           { error: "This email is already registered. Please sign in instead." },
-          { status: 409 },
+          { status: 409, headers: noStore },
         );
       }
       throw error;
@@ -57,7 +71,7 @@ export async function POST(request: Request) {
     await createSession(user);
     void audit({ userId: user.id, action: "AUTH_REGISTER", resource: "USER", resourceId: user.id, ip });
 
-    return NextResponse.json({ user }, { status: 201 });
+    return NextResponse.json({ user }, { status: 201, headers: noStore });
   } catch (error) {
     console.error("AUTH_REGISTER_FAILED", error);
     void audit({
@@ -68,17 +82,16 @@ export async function POST(request: Request) {
       metadata: { code: (error as { code?: string })?.code ?? "UNKNOWN" },
     });
 
-    const code = (error as { code?: string })?.code;
-    if (code === "P2021" || code === "P1001" || code === "P1002" || code === "P1017") {
+    if (databaseError(error)) {
       return NextResponse.json(
-        { error: "Database is not connected. Configure the production DATABASE_URL and redeploy." },
-        { status: 503 },
+        { error: "Database is unavailable. Check the production DATABASE_URL and redeploy." },
+        { status: 503, headers: noStore },
       );
     }
 
     return NextResponse.json(
       { error: "Unable to create your account right now. Please try again." },
-      { status: 503 },
+      { status: 503, headers: noStore },
     );
   }
 }
