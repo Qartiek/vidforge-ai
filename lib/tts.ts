@@ -5,7 +5,7 @@ export async function synthesizeSpeech(text: string): Promise<Buffer> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
   const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_TTS_MODEL || "tts-1";
+  const model = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
   const voice = (process.env.OPENAI_TTS_VOICE || "alloy") as "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
   const response = await client.audio.speech.create({
     model,
