@@ -4,16 +4,16 @@
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Role') THEN
     CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'plan') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Plan') THEN
     CREATE TYPE "Plan" AS ENUM ('FREE', 'STARTER', 'PRO', 'BUSINESS');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'projectstatus') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ProjectStatus') THEN
     CREATE TYPE "ProjectStatus" AS ENUM ('DRAFT', 'QUEUED', 'RESEARCHING', 'SCRIPTING', 'PRODUCING', 'COMPLETE', 'FAILED');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'jobstatus') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'JobStatus') THEN
     CREATE TYPE "JobStatus" AS ENUM ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED');
   END IF;
 END $$;
