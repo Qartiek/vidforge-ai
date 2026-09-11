@@ -7,9 +7,16 @@ function isPrivateHost(hostname: string) {
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h === "0.0.0.0" || h === "::") return true;
   const v4 = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (v4) {
-    const [a,b,c,d] = v4.slice(1).map(Number);
-    if ([a,b,c,d].some((n) => n > 255)) return true;
-    return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    const [a, b, c, d] = v4.slice(1).map(Number);
+    if ([a, b, c, d].some((n) => n > 255)) return true;
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
   }
   if (h.includes(":")) {
     const normalized = h.toLowerCase();
@@ -52,7 +59,12 @@ export async function fetchSource(input: SourceInput) {
   const type = response.headers.get("content-type") || "";
   if (!type.includes("text/html") && !type.includes("text/plain") && !type.includes("application/json")) throw new Error("Unsupported source type");
   const raw = (await response.text()).slice(0, 200_000);
-  const content = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const content = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return {
     url,
     title: input.title || null,
