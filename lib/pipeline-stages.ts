@@ -70,10 +70,10 @@ async function runVoice(projectId: string, script: string) {
 async function runImage(projectId: string, prompt: string, type: "visual" | "thumbnail", sceneIndex?: number) {
   const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
   const result = await client.images.generate({
-    model: process.env.OPENAI_IMAGE_MODEL || "dall-e-3",
+    model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
     prompt: prompt.slice(0, 4000),
     size: "1536x1024",
-    quality: process.env.OPENAI_IMAGE_QUALITY === "low" ? "low" : "standard",
+    quality: process.env.OPENAI_IMAGE_QUALITY === "low" ? "low" : "medium",
   });
   const item = result.data?.[0];
   if (!item?.b64_json) throw new Error("Image provider returned no image data");
