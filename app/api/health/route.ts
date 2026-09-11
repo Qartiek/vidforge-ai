@@ -4,17 +4,47 @@ import { db } from "../../../lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const noStore = { "Cache-Control": "no-store, no-cache, must-revalidate" };
+
 export async function GET() {
+  const databaseConfigured = Boolean(process.env.DATABASE_URL);
+
+  if (!databaseConfigured) {
+    return NextResponse.json(
+      {
+        ok: false,
+        service: "vidforge-ai",
+        status: "degraded",
+        checks: { databaseConfigured: false, databaseReachable: false },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503, headers: noStore },
+    );
+  }
+
   try {
     await db.$queryRaw`SELECT 1`;
     return NextResponse.json(
-      { ok: true, service: "vidforge-ai", status: "ready", timestamp: new Date().toISOString() },
-      { status: 200, headers: { "Cache-Control": "no-store" } },
+      {
+        ok: true,
+        service: "vidforge-ai",
+        status: "ready",
+        checks: { databaseConfigured: true, databaseReachable: true },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200, headers: noStore },
     );
-  } catch {
+  } catch (error) {
+    console.error("HEALTH_DATABASE_FAILED", error);
     return NextResponse.json(
-      { ok: false, service: "vidforge-ai", status: "degraded", timestamp: new Date().toISOString() },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
+      {
+        ok: false,
+        service: "vidforge-ai",
+        status: "degraded",
+        checks: { databaseConfigured: true, databaseReachable: false },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503, headers: noStore },
     );
   }
 }
