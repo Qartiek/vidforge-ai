@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
@@ -35,8 +35,8 @@
     "@types/react-dom": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",
-    "prisma": "6.19.3",
     "tailwindcss": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "prisma": "6.19.3"
   }
 }
