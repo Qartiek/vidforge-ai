@@ -25,8 +25,9 @@ export async function GET(request: Request) {
   const returnedState = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
   const cookieStore = await cookies();
-  const storedState = cookieStore.get("youtube_oauth_state")?.value;
-  cookieStore.delete("youtube_oauth_state");
+  const stateCookie = process.env.NODE_ENV === "production" ? "__Host-vidforge_youtube_oauth_state" : "vidforge_youtube_oauth_state";
+  const storedState = cookieStore.get(stateCookie)?.value;
+  cookieStore.delete(stateCookie);
 
   if (oauthError || !code || !returnedState || !storedState) {
     await audit({ userId: user.id, action: "YOUTUBE_OAUTH_CALLBACK", resource: "YOUTUBE", success: false, metadata: { reason: "invalid_callback" } });
