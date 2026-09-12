@@ -27,6 +27,7 @@ model User {
   automationProfiles AutomationProfile[]
   automationRuns AutomationRun[]
   contentCalendar ContentCalendar[]
+  socialConnections SocialConnection[]
 }
 
 model Session {
@@ -185,6 +186,24 @@ model YouTubeConnection {
   updatedAt    DateTime @updatedAt
 }
 
+model SocialConnection {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     SocialProvider
+  accountId    String
+  accountName  String?
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  scopes       String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider, accountId])
+  @@index([userId, provider])
+}
+
 model YouTubePublish {
   id             String        @id @default(cuid())
   userId         String
@@ -221,7 +240,7 @@ model YouTubeAnalytics {
   comments                    Int            @default(0)
   watchTimeMinutes            Float          @default(0)
   averageViewDurationSeconds  Float          @default(0)
-  averageViewPercentage      Float          @default(0)
+  averageViewPercentage      Float            @default(0)
   recommendationsJson        String?
   fetchedAt                  DateTime       @default(now())
   user                       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -246,8 +265,8 @@ model AutomationProfile {
   privacyStatus   String   @default("private")
   nextRunAt       DateTime?
   lastRunAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   runs            AutomationRun[]
   @@index([userId, enabled])
@@ -289,6 +308,15 @@ model ContentCalendar {
   publish     YouTubePublish? @relation(fields: [publishId], references: [id], onDelete: SetNull)
   @@index([userId, scheduledAt])
   @@index([status, scheduledAt])
+}
+
+enum SocialProvider {
+  META
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  LINKEDIN
+  X
 }
 
 enum Role {
