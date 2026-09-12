@@ -260,7 +260,7 @@ model AutomationRun {
   profileId     String
   projectId     String?
   status        AutomationRunStatus @default(QUEUED)
-  topic        String?
+  topic         String?
   error         String?
   startedAt     DateTime?
   finishedAt    DateTime?
@@ -291,10 +291,53 @@ model ContentCalendar {
   @@index([status, scheduledAt])
 }
 
-enum Role { USER ADMIN }
-enum Plan { FREE STARTER PRO BUSINESS }
-enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
-enum JobStatus { QUEUED RUNNING SUCCEEDED FAILED }
-enum PublishStatus { QUEUED UPLOADING PUBLISHED FAILED }
-enum AutomationRunStatus { QUEUED RUNNING SUCCEEDED FAILED SKIPPED }
-enum CalendarStatus { PLANNED IN_PROGRESS PUBLISHED CANCELLED }
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum ProjectStatus {
+  DRAFT
+  QUEUED
+  RESEARCHING
+  SCRIPTING
+  PRODUCING
+  COMPLETE
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum PublishStatus {
+  QUEUED
+  UPLOADING
+  PUBLISHED
+  FAILED
+}
+
+enum AutomationRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum CalendarStatus {
+  PLANNED
+  IN_PROGRESS
+  PUBLISHED
+  CANCELLED
+}
