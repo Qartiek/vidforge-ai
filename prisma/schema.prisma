@@ -24,6 +24,9 @@ model User {
   youtube     YouTubeConnection?
   publishes   YouTubePublish[]
   analytics   YouTubeAnalytics[]
+  automationProfiles AutomationProfile[]
+  automationRuns AutomationRun[]
+  contentCalendar ContentCalendar[]
 }
 
 model Session {
@@ -65,6 +68,8 @@ model Project {
   assets     MediaAsset[]
   publishes  YouTubePublish[]
   analytics  YouTubeAnalytics[]
+  automationRuns AutomationRun[]
+  contentCalendar ContentCalendar[]
 }
 
 model ResearchSource {
@@ -191,6 +196,7 @@ model YouTubePublish {
   description    String?
   tagsJson       String?
   privacyStatus  String        @default("private")
+  scheduledAt    DateTime?
   assetRef       String
   error          String?
   createdAt      DateTime      @default(now())
@@ -198,8 +204,10 @@ model YouTubePublish {
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   analytics      YouTubeAnalytics[]
+  calendarItems  ContentCalendar[]
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
+  @@index([status, scheduledAt])
 }
 
 model YouTubeAnalytics {
@@ -223,38 +231,70 @@ model YouTubeAnalytics {
   @@index([publishId, fetchedAt])
 }
 
-enum Role {
-  USER
-  ADMIN
+model AutomationProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String   @default("Default AutoPilot")
+  enabled         Boolean  @default(false)
+  niche           String
+  audience        String
+  language        String   @default("English")
+  cadence         String   @default("weekly")
+  publishHourUtc  Int      @default(12)
+  videosPerRun    Int      @default(1)
+  autoPublish     Boolean  @default(false)
+  privacyStatus   String   @default("private")
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs            AutomationRun[]
+  @@index([userId, enabled])
+  @@index([enabled, nextRunAt])
 }
 
-enum Plan {
-  FREE
-  STARTER
-  PRO
-  BUSINESS
+model AutomationRun {
+  id            String   @id @default(cuid())
+  userId        String
+  profileId     String
+  projectId     String?
+  status        AutomationRunStatus @default(QUEUED)
+  topic        String?
+  error         String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile       AutomationProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([profileId, createdAt])
 }
 
-enum ProjectStatus {
-  DRAFT
-  QUEUED
-  RESEARCHING
-  SCRIPTING
-  PRODUCING
-  COMPLETE
-  FAILED
+model ContentCalendar {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  publishId   String?
+  scheduledAt DateTime
+  status      CalendarStatus @default(PLANNED)
+  title       String
+  topic       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  publish     YouTubePublish? @relation(fields: [publishId], references: [id], onDelete: SetNull)
+  @@index([userId, scheduledAt])
+  @@index([status, scheduledAt])
 }
 
-enum JobStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
-}
-
-enum PublishStatus {
-  QUEUED
-  UPLOADING
-  PUBLISHED
-  FAILED
-}
+enum Role { USER ADMIN }
+enum Plan { FREE STARTER PRO BUSINESS }
+enum ProjectStatus { DRAFT QUEUED RESEARCHING SCRIPTING PRODUCING COMPLETE FAILED }
+enum JobStatus { QUEUED RUNNING SUCCEEDED FAILED }
+enum PublishStatus { QUEUED UPLOADING PUBLISHED FAILED }
+enum AutomationRunStatus { QUEUED RUNNING SUCCEEDED FAILED SKIPPED }
+enum CalendarStatus { PLANNED IN_PROGRESS PUBLISHED CANCELLED }
