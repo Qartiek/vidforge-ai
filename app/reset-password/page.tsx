@@ -34,7 +34,7 @@ export default function ResetPassword() {
 
   return (
     <main className="auth-page"><div className="auth-shell">
-      <section className="auth-copy"><div className="auth-brand">VIDFORGE AI · GEN 7</div><h1 className="auth-title">New.<br /><span className="auth-gradient">Password.</span><br />Fresh Start.</h1><p className="auth-subtitle">Choose a strong new password. Your existing sessions will be signed out for security.</p></section>
+      <section className="auth-copy"><div className="auth-brand">NOVYN · AI CONTENT STUDIO</div><h1 className="auth-title">New.<br /><span className="auth-gradient">Password.</span><br />Fresh Start.</h1><p className="auth-subtitle">Choose a strong new password. Your existing sessions will be signed out for security.</p></section>
       <form className="auth-card" onSubmit={submit}>
         <h2>Set new password</h2><p className="auth-muted">Use 8–128 characters.</p>
         <label className="auth-label" htmlFor="password">New password</label>
