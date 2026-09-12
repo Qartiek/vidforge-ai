@@ -45,13 +45,13 @@ export default function Login() {
     <main className="auth-page">
       <div className="auth-shell">
         <section className="auth-copy">
-          <div className="auth-brand">VIDFORGE AI · GEN 7</div>
+          <div className="auth-brand">NOVYN · AI CONTENT STUDIO</div>
           <h1 className="auth-title">Create.<br /><span className="auth-gradient">Automate.</span><br />Publish.</h1>
           <p className="auth-subtitle">Your AI workspace for research, scripts, thumbnails, voiceovers, editing, SEO and multi-platform content automation.</p>
         </section>
         <form className="auth-card" onSubmit={submit}>
           <h2>Welcome back</h2>
-          <p className="auth-muted">Sign in to your VidForge workspace.</p>
+          <p className="auth-muted">Sign in to your NOVYN workspace.</p>
           {resetSuccess && <p className="auth-muted" role="status">Password updated successfully. Please sign in with your new password.</p>}
           <label className="auth-label" htmlFor="email">Email</label>
           <input id="email" className="auth-input" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
@@ -60,7 +60,7 @@ export default function Login() {
           <div style={{ textAlign: "right", marginTop: 8, marginBottom: 8 }}><Link className="auth-link" href="/forgot-password">Forgot password?</Link></div>
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="auth-submit" disabled={busy}>{busy ? "Signing in…" : "Sign in →"}</button>
-          <p className="auth-switch">New to VidForge? <Link className="auth-link" href="/signup">Create account</Link></p>
+          <p className="auth-switch">New to NOVYN? <Link className="auth-link" href="/signup">Create account</Link></p>
         </form>
       </div>
     </main>
