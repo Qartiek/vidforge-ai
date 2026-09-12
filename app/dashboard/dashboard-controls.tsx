@@ -35,7 +35,7 @@ export default function DashboardControls({ projectId }: { projectId: string | n
       <div className="workspace-head"><div><span className="eyebrow">YOUTUBE CHANNEL</span><h2>{youtube.connected ? (youtube.channelTitle || "Channel connected") : "Connect your channel"}</h2></div><span className={`live-pill ${youtube.connected ? "success" : ""}`}><span/> {youtube.connected ? "Connected" : "Not connected"}</span></div>
       <p className="muted">Connect once to unlock secure uploads, scheduled publishing and channel analytics.</p>
       <div className="dashboard-actions">
-        {youtube.connected ? <><a className="cta" href="/schedule">Schedule a video →</a><a className="cta secondary-cta" href="/api/youtube/disconnect">Reconnect YouTube</a></> : <a className="cta" href="/api/youtube/connect">Connect YouTube →</a>}
+        {youtube.connected ? <><a className="cta" href="/schedule">Schedule a video →</a><a className="cta secondary-cta" href="/api/youtube/connect">Reconnect YouTube</a></> : <a className="cta" href="/api/youtube/connect">Connect YouTube →</a>}
       </div>
     </section>
 
