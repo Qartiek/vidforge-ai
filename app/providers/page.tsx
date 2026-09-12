@@ -1,42 +1,4 @@
 "use client";
-
-import { useEffect, useState } from "react";
-
-type ProviderState = Record<string, { configured?: boolean }>;
-
-export default function Providers() {
-  const [data, setData] = useState<{ providers?: ProviderState }>();
-
-  useEffect(() => {
-    fetch("/api/providers", { cache: "no-store" })
-      .then((response) => response.json())
-      .then(setData)
-      .catch(() => setData(undefined));
-  }, []);
-
-  return (
-    <main className="container">
-      <nav className="nav">
-        <a className="logo" href="/">NOVYN</a>
-        <span className="muted">AI Providers</span>
-      </nav>
-      <section style={{ padding: "45px 0" }}>
-        <span className="badge">PROVIDER CONTROL</span>
-        <h1 style={{ fontSize: 42 }}>AI provider layer</h1>
-        <p className="muted">
-          Keys remain server-side. Provider availability can be checked without exposing secrets.
-        </p>
-        <div className="grid">
-          {["openai", "anthropic", "google"].map((provider) => (
-            <article className="card" key={provider}>
-              <h3>{provider}</h3>
-              <p className="muted">
-                {data?.providers?.[provider]?.configured ? "Configured" : "Not configured"}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
-    </main>
-  );
-}
+import {useEffect,useState} from "react";
+type ProviderState=Record<string,{configured?:boolean;connected?:boolean;available?:boolean}>;
+export default function Providers(){const[data,setData]=useState<{providers?:ProviderState}>();useEffect(()=>{fetch("/api/providers",{cache:"no-store"}).then(r=>r.json()).then(setData).catch(()=>setData(undefined))},[]);const cards=[{id:"youtube",name:"YouTube",desc:"OAuth publishing, scheduling and analytics",href:"/api/youtube/connect"},{id:"instagram",name:"Instagram",desc:"Reels-ready publishing integration",href:"#instagram"},{id:"facebook",name:"Facebook",desc:"Page video and Reels publishing integration",href:"#facebook"},{id:"tiktok",name:"TikTok",desc:"Short-form publishing pipeline",href:"#tiktok"},{id:"openai",name:"OpenAI",desc:"Generation, reasoning, voice and visual intelligence",href:"#openai"},{id:"anthropic",name:"Anthropic",desc:"Optional advanced model provider",href:"#anthropic"},{id:"google",name:"Google AI",desc:"Optional multimodal provider",href:"#google"}];return <main className="container"><nav className="nav"><a className="logo" href="/">NOVYN</a><span className="muted">Connections & Integrations</span></nav><section style={{padding:"45px 0"}}><span className="badge">CONNECT YOUR CONTENT ECOSYSTEM</span><h1 style={{fontSize:42}}>Social + AI integrations</h1><p className="muted">Connect the platforms NOVYN can publish to. OAuth secrets and access tokens stay server-side.</p><div className="grid">{cards.map(card=><article className="card" id={card.id} key={card.id}><h3>{card.name}</h3><p className="muted">{card.desc}</p>{card.id==="youtube"?<a className="generate-btn" href={card.href}>Connect YouTube →</a>:<div><span className="live-pill">{card.id==="openai"&&data?.providers?.openai?.configured?"Configured":"Connection ready"}</span><p className="muted" style={{marginTop:12}}>Meta/TikTok publishing needs the platform's app credentials and approved OAuth permissions before a real account can be connected.</p></div>}</article>)}</div></section></main>}
