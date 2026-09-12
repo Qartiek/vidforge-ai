@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && (prisma migrate resolve --rolled-back 20260911000200_pipeline_job_idempotency || true) && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
