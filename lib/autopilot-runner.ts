@@ -9,14 +9,15 @@ function required(name: string) {
   return value;
 }
 
-async function chooseTopic(niche: string, audience: string, language: string) {
+async function chooseTopic(niche: string, audience: string, language: string, recentTopics: string[]) {
   const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
+  const excluded = recentTopics.length ? `\nDo NOT repeat or closely paraphrase these recent topics:\n${recentTopics.map((t) => `- ${t}`).join("\n")}` : "";
   const r = await client.chat.completions.create({
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "You are an original YouTube topic strategist. Avoid repetitive or mass-produced ideas. Choose a specific, useful topic with a clear viewer promise. Return JSON only." },
-      { role: "user", content: `Niche: ${niche}\nAudience: ${audience}\nLanguage: ${language}\nReturn {topic, angle, whyNow}. The topic must be suitable for factual research and a long-form YouTube video.` },
+      { role: "user", content: `Niche: ${niche}\nAudience: ${audience}\nLanguage: ${language}${excluded}\nReturn {topic, angle, whyNow}. The topic must be suitable for factual research and a long-form YouTube video.` },
     ],
   });
   const raw = r.choices[0]?.message?.content;
@@ -31,7 +32,7 @@ async function discoverSources(topic: string) {
   const response = await fetch(rss, { headers: { "user-agent": "VidForgeAI-AutoPilot/1.0" }, signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`News discovery failed (${response.status})`);
   const xml = await response.text();
-  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 5).map((m) => {
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 8).map((m) => {
     const block = m[1];
     const title = (block.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "").replace(/<!\[CDATA\[|\]\]>/g, "").trim();
     const link = (block.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "").trim();
@@ -101,7 +102,9 @@ async function createScript(projectId: string, topic: string, angle: string, lan
 export async function runAutoPilotRun(runId: string) {
   const run = await db.automationRun.findUnique({ where: { id: runId }, include: { profile: true } });
   if (!run) throw new Error("Automation run not found");
-  const topic = await chooseTopic(run.profile.niche, run.profile.audience, run.profile.language);
+  const recentProjects = await db.project.findMany({ where: { userId: run.userId }, select: { topic: true }, orderBy: { createdAt: "desc" }, take: 20 });
+  const recentTopics = recentProjects.map((p) => p.topic).filter(Boolean) as string[];
+  const topic = await chooseTopic(run.profile.niche, run.profile.audience, run.profile.language, recentTopics);
   const project = await db.project.create({ data: { userId: run.userId, title: topic.topic.slice(0, 120), topic: topic.topic, status: "RESEARCHING" } });
   await db.automationRun.update({ where: { id: run.id }, data: { projectId: project.id, topic: topic.topic, status: "RUNNING", startedAt: new Date() } });
   const sources = await discoverSources(topic.topic);
