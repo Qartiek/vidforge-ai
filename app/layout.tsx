@@ -3,7 +3,7 @@ import "./globals.css";
 import "./auth.css";
 
 export const metadata: Metadata = {
-  title: "VidForge AI",
+  title: "NOVYN",
   description: "AI-powered content creation and YouTube automation studio.",
 };
 
