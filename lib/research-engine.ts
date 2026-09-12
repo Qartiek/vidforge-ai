@@ -1,4 +1,27 @@
-export type ResearchBrief={topic:string;audience?:string;platform?:string;language?:string};
-export type ResearchPlan={queries:string[];signals:string[];questions:string[];verificationRules:string[];contentAngles:string[]};
-export function buildResearchPlan(brief:ResearchBrief):ResearchPlan{const topic=brief.topic.trim();return{queries:[topic,`${topic} latest trends`,`${topic} common questions`,`${topic} beginner mistakes`,`${topic} alternatives comparison`],signals:["search intent","audience questions","content gaps","recurring themes","recent developments"],questions:["What does the audience already know?","What problem is most urgent?","What information is missing from existing content?","Which claims need primary-source verification?","Which angle gives useful value fastest?"],verificationRules:["Prefer primary or authoritative sources","Separate facts from opinions","Do not fabricate statistics, quotes or events","Mark unresolved claims [VERIFY]","Record source URLs with findings"],contentAngles:["problem → solution","myth → reality","step-by-step","comparison","story/case study"]};}
-export function buildResearchPrompt(brief:ResearchBrief){return`Act as VidForge AI's research strategist. Research topic: ${brief.topic}. Audience: ${brief.audience||"general audience"}. Platform: ${brief.platform||"YouTube"}. Language: ${brief.language||"English"}. Identify search intent, audience questions, content gaps, useful angles and claims requiring verification. Never invent sources or current facts. Return strict JSON with keys: summary,audienceIntent,keyFindings,contentGaps,keywords,angles,claimsToVerify,sources.`;}
+export type ResearchBrief = { topic: string; audience: string; platform: string; language: string };
+
+export function buildResearchPlan(brief: ResearchBrief) {
+  return {
+    angle: `Research the most compelling and underserved angle for ${brief.topic} targeting ${brief.audience}`,
+    sources: [
+      `Academic and peer-reviewed research on ${brief.topic}`,
+      `Industry reports and analyst perspectives on ${brief.topic}`,
+      `Recent news and developments in ${brief.topic}`,
+      `Expert commentary and thought leadership on ${brief.topic}`,
+      `Case studies and real-world examples of ${brief.topic}`,
+    ],
+    synthesis: `Synthesize findings into a unique, audience-first angle that serves ${brief.audience} on ${brief.platform}`,
+  };
+}
+
+export function buildResearchPrompt(brief: ResearchBrief) {
+  return `You are a research synthesizer for content creators. Given the topic "${brief.topic}" and target audience "${brief.audience}" on ${brief.platform}:
+
+1. Identify the most compelling, underserved angle that will resonate with this audience
+2. List the key claims, statistics, and evidence that support this angle
+3. Highlight any research gaps or claims that need verification
+4. Recommend the strongest sources and evidence to build this story
+5. Suggest the optimal narrative structure for ${brief.platform}
+
+Return a JSON object with keys: angle, keyFacts, verificationNeeds, recommendedSources, narrativeStructure.`;
+}

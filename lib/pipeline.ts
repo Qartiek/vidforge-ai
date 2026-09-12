@@ -21,12 +21,41 @@ export function nextPipelineStage(stage: PipelineStage): PipelineStage | null {
 }
 
 export async function enqueuePipelineStage(userId: string, payload: PipelinePayload) {
-  const existing = await db.job.findFirst({
-    where: { userId, projectId: payload.projectId, type: `pipeline:${payload.stage}`, status: { in: ["QUEUED", "RUNNING"] } },
-    orderBy: { createdAt: "desc" },
-  });
-  if (existing) return existing;
-  return db.job.create({ data: { userId, projectId: payload.projectId, type: `pipeline:${payload.stage}`, status: "QUEUED", payload: JSON.stringify(payload) } });
+  const type = `pipeline:${payload.stage}`;
+
+  if (payload.previousJobId) {
+    const existing = await db.job.findUnique({
+      where: { previousJobId_type: { previousJobId: payload.previousJobId, type } },
+    });
+    if (existing) return existing;
+  } else {
+    const existing = await db.job.findFirst({
+      where: { userId, projectId: payload.projectId, type, status: { in: ["QUEUED", "RUNNING"] } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existing) return existing;
+  }
+
+  try {
+    return await db.job.create({
+      data: {
+        userId,
+        projectId: payload.projectId,
+        previousJobId: payload.previousJobId,
+        type,
+        status: "QUEUED",
+        payload: JSON.stringify(payload),
+      },
+    });
+  } catch (error) {
+    if (payload.previousJobId && error instanceof Error && "code" in error && error.code === "P2002") {
+      const existing = await db.job.findUnique({
+        where: { previousJobId_type: { previousJobId: payload.previousJobId, type } },
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
 export async function advancePipeline(jobId: string) {

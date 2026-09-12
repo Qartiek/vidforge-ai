@@ -1,6 +1,14 @@
 import { db } from "./db";
 
-export async function audit(input: { userId?: string | null; action: string; resource?: string; resourceId?: string; success?: boolean; ip?: string; metadata?: Record<string, unknown> }) {
+export async function audit(input: {
+  userId?: string | null;
+  action: string;
+  resource?: string;
+  resourceId?: string;
+  success?: boolean;
+  ip?: string;
+  metadata?: Record<string, unknown>;
+}) {
   try {
     return await db.auditLog.create({
       data: {
