@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "degraded",
         checks: { databaseConfigured: false, databaseReachable: false },
         timestamp: new Date().toISOString(),
@@ -27,7 +27,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: true,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "ready",
         checks: { databaseConfigured: true, databaseReachable: true },
         timestamp: new Date().toISOString(),
@@ -39,7 +39,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "degraded",
         checks: { databaseConfigured: true, databaseReachable: false },
         timestamp: new Date().toISOString(),
