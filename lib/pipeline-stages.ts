@@ -126,6 +126,40 @@ async function generateSeo(projectId: string, scriptId: string, topic: string, t
   return data;
 }
 
+async function getVideoRenderSettings(userId: string, aspectRatio: string, projectDurationSeconds: number) {
+  const rows = await db.$queryRaw<Array<{ data: unknown }>>`SELECT "data" FROM "UserSettings" WHERE "userId" = ${userId} LIMIT 1`;
+  const root = rows[0]?.data;
+  const data = root && typeof root === "object" ? root as Record<string, unknown> : {};
+  const video = data.video && typeof data.video === "object" ? data.video as Record<string, unknown> : {};
+  const savedQuality = String(video.quality || "1080p Full HD");
+  const savedAspect = String(video.aspectRatio || aspectRatio || "16:9");
+  const savedFps = Number(video.fps || 30);
+  const quality = savedQuality === "4K" || savedQuality === "4K UHD" ? "4K UHD" : savedQuality === "1440p 2K" ? "1440p 2K" : savedQuality === "720p HD" ? "720p HD" : "1080p Full HD";
+  const fps = [24, 30, 60].includes(savedFps) ? savedFps : 30;
+  const ratio = ["16:9", "9:16", "1:1", "4:5"].includes(savedAspect) ? savedAspect : "16:9";
+  const heights: Record<string, number> = { "720p HD": 720, "1080p Full HD": 1080, "1440p 2K": 1440, "4K UHD": 2160 };
+  const height = heights[quality];
+  const dimensions: Record<string, [number, number]> = {
+    "16:9": [Math.round(height * 16 / 9), height],
+    "9:16": [height, Math.round(height * 16 / 9)],
+    "1:1": [height, height],
+    "4:5": [Math.round(height * 4 / 5), height],
+  };
+  const [width, finalHeight] = dimensions[ratio];
+  return {
+    format: "mp4",
+    container: "mp4",
+    codec: "h264",
+    pixelFormat: "yuv420p",
+    quality,
+    width,
+    height: finalHeight,
+    fps,
+    durationSeconds: Math.max(1, projectDurationSeconds),
+    audioCodec: "aac",
+  };
+}
+
 export async function executePipelineStage(stage: string, projectId: string, scriptId: string) {
   const project = await db.project.findFirst({
     where: { id: projectId },
@@ -199,12 +233,18 @@ export async function executePipelineStage(stage: string, projectId: string, scr
       .sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
     const audioAssets = project.assets.filter((a) => a.type === "audio").sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
     if (!visualAssets.length || !audioAssets.length) throw new Error("Render requires visual and voice assets");
+    const renderSettings = await getVideoRenderSettings(project.userId, "16:9", Math.max(1, Number(project.durationSeconds || 60)));
     const manifest = {
-      version: 2,
+      version: 3,
       format: "mp4",
-      width: 1920,
-      height: 1080,
-      fps: 30,
+      container: "mp4",
+      codec: "h264",
+      pixelFormat: "yuv420p",
+      quality: renderSettings.quality,
+      width: renderSettings.width,
+      height: renderSettings.height,
+      fps: renderSettings.fps,
+      durationSeconds: renderSettings.durationSeconds,
       scenes: visualAssets.map((a, i) => ({
         index: a.sceneIndex ?? i,
         assetUrl: a.url,
@@ -212,7 +252,7 @@ export async function executePipelineStage(stage: string, projectId: string, scr
         transition: "crossfade",
         duration: 4,
       })),
-      audio: { urls: audioAssets.map((a) => a.url), format: "aac" },
+      audio: { urls: audioAssets.map((a) => a.url), format: "aac", codec: "aac" },
       captions: { enabled: true, format: "srt", source: "script" },
     };
     const outputUrl = validateRenderedAsset(
@@ -233,7 +273,7 @@ export async function executePipelineStage(stage: string, projectId: string, scr
         metadata: JSON.stringify({ rendered: true, manifest }),
       },
     });
-    return { assetId: row.id, outputUrl };
+    return { assetId: row.id, outputUrl, format: "mp4", quality: renderSettings.quality, width: renderSettings.width, height: renderSettings.height, fps: renderSettings.fps };
   }
   if (stage === "quality") {
     const check = runContentQualityChecks({
