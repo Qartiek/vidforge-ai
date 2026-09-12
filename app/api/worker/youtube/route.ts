@@ -28,16 +28,20 @@ export async function POST(request: Request) {
   if (claimed.count !== 1) return NextResponse.json({ status: "RUNNING" }, { status: 409 });
   let file: string | undefined;
   let publishId: string | undefined;
+  let automationRunId: string | undefined;
   let uploadStarted = false;
   try {
-    const payload = JSON.parse(job.payload) as { publishId?: string };
+    const payload = JSON.parse(job.payload) as { publishId?: string; automationRunId?: string };
     publishId = payload.publishId;
+    automationRunId = payload.automationRunId;
     if (!publishId) throw new Error("Invalid YouTube publish job payload");
     const publish = await db.youTubePublish.findFirst({ where: { id: publishId, userId: job.userId } });
     if (!publish) throw new Error("Publish record not found");
     if (publish.status === "PUBLISHED" && publish.youtubeVideoId) {
       const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? null, publish.id, publish.youtubeVideoId);
       await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+      if (automationRunId) await db.automationRun.updateMany({ where: { id: automationRunId, userId: job.userId }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+      if (job.projectId) await db.project.update({ where: { id: job.projectId, userId: job.userId }, data: { status: "COMPLETE" } });
       return NextResponse.json({ status: "PUBLISHED", publishId, youtubeVideoId: publish.youtubeVideoId, analyticsJobId: analyticsJob.id });
     }
     const access = await getValidYouTubeAccessToken(job.userId);
@@ -46,18 +50,21 @@ export async function POST(request: Request) {
     const tags = publish.tagsJson ? JSON.parse(publish.tagsJson) as string[] : [];
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "UPLOADING", error: null } });
     uploadStarted = true;
-    const videoId = await uploadYouTubeVideo(access.accessToken, { file, title: publish.title, description: publish.description, tags, privacyStatus: publish.privacyStatus });
+    const videoId = await uploadYouTubeVideo(access.accessToken, { file, title: publish.title, description: publish.description, tags, privacyStatus: publish.privacyStatus, scheduledAt: publish.scheduledAt });
     await db.youTubePublish.update({ where: { id: publish.id }, data: { status: "PUBLISHED", youtubeVideoId: videoId, publishedAt: new Date(), error: null } });
     const analyticsJob = await recordAnalyticsJob(job.userId, job.projectId ?? null, publish.id, videoId);
     await db.job.update({ where: { id: job.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
-    await audit({ userId: job.userId, action: "YOUTUBE_PUBLISHED", resource: "YOUTUBE_PUBLISH", resourceId: publish.id, metadata: { videoId, analyticsJobId: analyticsJob.id } });
+    if (automationRunId) await db.automationRun.updateMany({ where: { id: automationRunId, userId: job.userId }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+    if (job.projectId) await db.project.update({ where: { id: job.projectId, userId: job.userId }, data: { status: "COMPLETE" } });
+    await audit({ userId: job.userId, action: "YOUTUBE_PUBLISHED", resource: "YOUTUBE_PUBLISH", resourceId: publish.id, metadata: { videoId, analyticsJobId: analyticsJob.id, automationRunId } });
     return NextResponse.json({ status: "PUBLISHED", publishId, youtubeVideoId: videoId, analyticsJobId: analyticsJob.id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "YouTube upload failed";
     const retryable = !uploadStarted && job.attempts < MAX_ATTEMPTS;
     if (publishId) await db.youTubePublish.updateMany({ where: { id: publishId, userId: job.userId }, data: { status: retryable ? "QUEUED" : "FAILED", error: message.slice(0, 1000) } });
     await db.job.update({ where: { id: job.id }, data: { status: retryable ? "QUEUED" : "FAILED", finishedAt: retryable ? null : new Date(), error: message.slice(0, 1000) } });
-    await audit({ userId: job.userId, action: "YOUTUBE_PUBLISH_FAILED", resource: "YOUTUBE_PUBLISH", success: false, resourceId: publishId, metadata: { retryable, uploadStarted } });
+    if (!retryable && automationRunId) await db.automationRun.updateMany({ where: { id: automationRunId, userId: job.userId }, data: { status: "FAILED", finishedAt: new Date(), error: message.slice(0, 1000) } });
+    await audit({ userId: job.userId, action: "YOUTUBE_PUBLISH_FAILED", resource: "YOUTUBE_PUBLISH", success: false, resourceId: publishId, metadata: { retryable, uploadStarted, automationRunId } });
     return NextResponse.json({ error: "YouTube upload failed", retryable, attempts: job.attempts }, { status: retryable ? 503 : 500 });
   } finally { if (file) await removeMaterializedAsset(file).catch(() => undefined); }
 }
