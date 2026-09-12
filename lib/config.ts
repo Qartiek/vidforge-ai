@@ -1,5 +1,5 @@
 export const appConfig = {
-  name: "VidForge AI",
+  name: "NOVYN",
   version: "0.5.0",
   plans: {
     starter: { priceInr: 299, monthlyVideos: 5 },
