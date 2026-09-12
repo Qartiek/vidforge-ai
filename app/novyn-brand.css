@@ -1,0 +1,5 @@
+/* NOVYN premium brand layer */
+:root{--novyn-red:#ff3b30;--novyn-violet:#8b5cf6;--novyn-blue:#2563eb}
+.logo:before{content:"N";background:linear-gradient(135deg,var(--novyn-red),var(--novyn-violet) 55%,var(--novyn-blue));box-shadow:0 0 30px rgba(139,92,246,.32),0 0 34px rgba(255,59,48,.14)}
+.auth-brand{color:#fff;letter-spacing:1.4px}
+.auth-gradient{background:linear-gradient(100deg,#fff 0%,#c4b5fd 42%,#60a5fa 72%,#ff6b61 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
