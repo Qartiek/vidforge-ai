@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resetPassword } from "@/lib/password-reset";
+import { resetPassword } from "../../../../lib/password-reset";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
