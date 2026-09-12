@@ -32,7 +32,6 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("PASSWORD_RESET_REQUEST_FAILED", error);
-    return NextResponse.json({ error: "Password reset email is temporarily unavailable. Please try again later." }, { status: 503, headers: noStore });
   }
 
   return NextResponse.json({ message: genericMessage }, { headers: noStore });
