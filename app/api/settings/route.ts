@@ -6,7 +6,7 @@ const defaults = {
   appearance: { theme: "dark", density: "comfortable", motion: true },
   notifications: { email: true, product: true, jobs: true, marketing: false },
   ai: { creativity: 0.7, provider: "openai", model: "gpt-4o-mini" },
-  video: { aspectRatio: "16:9", quality: "1080p", duration: 60, fps: 30 },
+  video: { aspectRatio: "16:9", quality: "1080p Full HD", duration: 60, fps: 30 },
   voice: { voice: "alloy", captions: true, captionStyle: "clean" },
   privacy: { analytics: true, personalization: true },
   accessibility: { reducedMotion: false, highContrast: false },
