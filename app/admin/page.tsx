@@ -31,7 +31,7 @@ export default async function Admin() {
   return (
     <main className="container">
       <nav className="nav">
-        <div className="logo">VidForge AI <span className="muted">Admin</span></div>
+        <div className="logo">NOVYN <span className="muted">Admin</span></div>
       </nav>
       <section style={{ padding: "45px 0" }}>
         <span className="badge">SUPER ADMIN</span>
