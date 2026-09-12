@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "../../../../../lib/db";
-import { createPasswordResetToken, sendPasswordResetEmail } from "../../../../../lib/password-reset";
-import { rateLimit } from "../../../../../lib/rate-limit";
+import { db } from "@/lib/db";
+import { createPasswordResetToken, sendPasswordResetEmail } from "@/lib/password-reset";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
