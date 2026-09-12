@@ -47,3 +47,6 @@ Never commit real secrets to GitHub. `JOB_WORKER_SECRET` and `CRON_SECRET` must 
 
 ## Status
 **Public-ready application foundation.** Core security, persistence, billing foundation, YouTube OAuth, queued publishing, worker execution, free GitHub Actions dispatch and CI checks are implemented. External provider credentials, PostgreSQL and production asset/render infrastructure must still be configured before live AI generation, publishing and billing can operate.
+
+## Deployment
+Vercel build configuration uses `prisma generate && next build`; database migrations are intentionally run separately from the Vercel build.
