@@ -17,7 +17,7 @@ export default function Providers() {
   return (
     <main className="container">
       <nav className="nav">
-        <div className="logo">VidForge AI</div>
+        <a className="logo" href="/">NOVYN</a>
         <span className="muted">AI Providers</span>
       </nav>
       <section style={{ padding: "45px 0" }}>
