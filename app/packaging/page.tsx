@@ -25,15 +25,15 @@ export default function Packaging() {
   }
 
   return <main className="container">
-    <nav className="nav"><a className="logo" href="/">VidForge AI</a><div className="nav-actions"><a className="nav-link" href="/dashboard">Dashboard</a><span className="live-pill success"><span/>Viral Packaging Engine</span></div></nav>
+    <nav className="nav"><a className="logo" href="/">NOVYN</a><div className="nav-actions"><a className="nav-link" href="/dashboard">Dashboard</a><span className="live-pill success"><span/>Viral Packaging Engine</span></div></nav>
     <section className="studio-hero">
       <span className="badge">CTR + SEO + THUMBNAIL + VIRAL POTENTIAL</span>
       <h1 className="section-title">Make the <span className="gradient-text">packaging</span> impossible to ignore.</h1>
-      <p className="studio-subtitle">VidForge scores the topic, generates title and thumbnail variants, builds search metadata and blocks weak packaging before you publish.</p>
+      <p className="studio-subtitle">NOVYN scores the topic, generates title and thumbnail variants, builds search metadata and blocks weak packaging before you publish.</p>
     </section>
     <section className="workspace">
       <div className="workspace-head"><div><div className="eyebrow">VIRAL PACKAGING LAB</div><h2>What are you publishing?</h2></div><div className="live-pill"><span/>AI scoring</div></div>
-      <div className="topic-box"><label>Video topic</label><textarea value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Example: Why AI video editing is changing YouTube in 2026"/><div className="hint">Use the real topic. VidForge will find stronger angles instead of stuffing keywords.</div></div>
+      <div className="topic-box"><label>Video topic</label><textarea value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Example: Why AI video editing is changing YouTube in 2026"/><div className="hint">Use the real topic. NOVYN will find stronger angles instead of stuffing keywords.</div></div>
       <div className="control-grid">
         <div className="field"><label>Audience</label><input value={audience} onChange={e=>setAudience(e.target.value)} placeholder="e.g. Indian creators"/></div>
         <div className="field"><label>Niche</label><input value={niche} onChange={e=>setNiche(e.target.value)} placeholder="e.g. AI / YouTube"/></div>
