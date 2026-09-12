@@ -1,6 +1,6 @@
-# Security baseline
+# NOVYN Security Baseline
 
-VidForge AI treats security as a release requirement, not a feature added later.
+NOVYN treats security as a release requirement, not a feature added later.
 
 ## Required controls before production
 - Real authentication and server-side authorization on every protected resource.
