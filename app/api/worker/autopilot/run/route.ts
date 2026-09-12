@@ -18,7 +18,11 @@ export async function GET(request: Request) {
     try {
       await db.automationRun.update({ where: { id: run.id }, data: { status: "RUNNING", startedAt: new Date() } });
       await runAutoPilotRun(run.id);
-      await db.automationRun.update({ where: { id: run.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+      if (profile.autoPublish) {
+        // Keep the run RUNNING; the YouTube worker closes it only after publication.
+      } else {
+        await db.automationRun.update({ where: { id: run.id }, data: { status: "SUCCEEDED", finishedAt: new Date(), error: null } });
+      }
       succeeded++;
     } catch (error) {
       const message = error instanceof Error ? error.message : "AutoPilot run failed";
