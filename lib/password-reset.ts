@@ -47,9 +47,9 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string) {
     body: JSON.stringify({
       from,
       to: [email],
-      subject: "Reset your VidForge AI password",
-      text: `Reset your VidForge AI password using this link (valid for 1 hour):\n\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Reset your VidForge AI password</h2><p>This link is valid for 1 hour.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#111;color:#fff;text-decoration:none;border-radius:8px">Reset password</a></p><p>If you did not request this, you can safely ignore this email.</p></div>`,
+      subject: "Reset your NOVYN password",
+      text: `Reset your NOVYN password using this link (valid for 1 hour):\n\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6"><h2>Reset your NOVYN password</h2><p>This link is valid for 1 hour.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#111;color:#fff;text-decoration:none;border-radius:8px">Reset password</a></p><p>If you did not request this, you can safely ignore this email.</p></div>`,
     }),
   });
 
