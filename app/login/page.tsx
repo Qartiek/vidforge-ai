@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Login() {
   const router = useRouter();
@@ -9,6 +10,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  useEffect(() => {
+    setResetSuccess(new URLSearchParams(window.location.search).get("reset") === "success");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,13 +52,15 @@ export default function Login() {
         <form className="auth-card" onSubmit={submit}>
           <h2>Welcome back</h2>
           <p className="auth-muted">Sign in to your VidForge workspace.</p>
+          {resetSuccess && <p className="auth-muted" role="status">Password updated successfully. Please sign in with your new password.</p>}
           <label className="auth-label" htmlFor="email">Email</label>
           <input id="email" className="auth-input" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
           <label className="auth-label" htmlFor="password">Password</label>
           <input id="password" className="auth-input" required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+          <div style={{ textAlign: "right", marginTop: 8, marginBottom: 8 }}><Link className="auth-link" href="/forgot-password">Forgot password?</Link></div>
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="auth-submit" disabled={busy}>{busy ? "Signing in…" : "Sign in →"}</button>
-          <p className="auth-switch">New to VidForge? <a className="auth-link" href="/signup">Create account</a></p>
+          <p className="auth-switch">New to VidForge? <Link className="auth-link" href="/signup">Create account</Link></p>
         </form>
       </div>
     </main>
