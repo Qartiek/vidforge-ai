@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function Login() {
   const router = useRouter();
-  const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  useEffect(() => {
+    setResetSuccess(new URLSearchParams(window.location.search).get("reset") === "success");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +52,7 @@ export default function Login() {
         <form className="auth-card" onSubmit={submit}>
           <h2>Welcome back</h2>
           <p className="auth-muted">Sign in to your VidForge workspace.</p>
-          {params.get("reset") === "success" && <p className="auth-muted" role="status">Password updated successfully. Please sign in with your new password.</p>}
+          {resetSuccess && <p className="auth-muted" role="status">Password updated successfully. Please sign in with your new password.</p>}
           <label className="auth-label" htmlFor="email">Email</label>
           <input id="email" className="auth-input" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
           <label className="auth-label" htmlFor="password">Password</label>
