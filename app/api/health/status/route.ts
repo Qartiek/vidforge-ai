@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "degraded",
         version: "0.5.0",
         checks: { databaseConfigured: false, databaseReachable: false },
@@ -28,7 +28,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: true,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "ready",
         version: "0.5.0",
         checks: { databaseConfigured: true, databaseReachable: true },
@@ -50,7 +50,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        service: "vidforge-ai",
+        service: "novyn",
         status: "degraded",
         version: "0.5.0",
         checks: { databaseConfigured: true, databaseReachable: false },
