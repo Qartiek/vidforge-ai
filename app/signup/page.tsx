@@ -52,7 +52,7 @@ export default function Signup() {
     <main className="auth-page">
       <div className="auth-shell">
         <section className="auth-copy">
-          <div className="auth-brand">VIDFORGE AI · GEN 7</div>
+          <div className="auth-brand">NOVYN · AI CONTENT STUDIO</div>
           <h1 className="auth-title">
             Your studio.
             <br />
@@ -66,7 +66,7 @@ export default function Signup() {
 
         <form className="auth-card" onSubmit={submit}>
           <h2>Create your account</h2>
-          <p className="auth-muted">Start building with VidForge AI.</p>
+          <p className="auth-muted">Start building with NOVYN.</p>
 
           <label className="auth-label" htmlFor="name">
             Name
