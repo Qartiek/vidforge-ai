@@ -23,9 +23,9 @@ export default function ForgotPassword() {
 
   return (
     <main className="auth-page"><div className="auth-shell">
-      <section className="auth-copy"><div className="auth-brand">VIDFORGE AI · GEN 7</div><h1 className="auth-title">Reset.<br /><span className="auth-gradient">Securely.</span><br />Continue.</h1><p className="auth-subtitle">We’ll send a secure password-reset link to your email address.</p></section>
+      <section className="auth-copy"><div className="auth-brand">NOVYN · AI CONTENT STUDIO</div><h1 className="auth-title">Reset.<br /><span className="auth-gradient">Securely.</span><br />Continue.</h1><p className="auth-subtitle">We’ll send a secure password-reset link to your email address.</p></section>
       <form className="auth-card" onSubmit={submit}>
-        <h2>Forgot password?</h2><p className="auth-muted">Enter the email used for your VidForge account.</p>
+        <h2>Forgot password?</h2><p className="auth-muted">Enter the email used for your NOVYN account.</p>
         <label className="auth-label" htmlFor="email">Email</label>
         <input id="email" className="auth-input" required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
         {error && <p className="auth-error" role="alert">{error}</p>}
